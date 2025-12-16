@@ -73,12 +73,15 @@ class GmailService {
           this.auth.setCredentials(JSON.parse(token));
         } catch (err) {
           console.log('No stored Gmail token found. Gmail features will require authentication.');
-          return false;
+          // Don't return false here - we still want to allow getting the auth URL
         }
       }
 
       this.gmail = google.gmail({ version: 'v1', auth: this.auth });
       this.calendar = google.calendar({ version: 'v3', auth: this.auth });
+
+      // Return true if we have credentials (even without token)
+      // This allows the auth flow to work
       return true;
     } catch (error) {
       console.error('Failed to initialize Gmail service:', error);
