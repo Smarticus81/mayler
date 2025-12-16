@@ -68,10 +68,14 @@ const similarity = (a: string, b: string) => {
   return 1 - dist / maxLen;
 };
 
-const WAKE_WORDS = ['mayler', 'may-ler', 'may ler', 'hey mayler', 'hey may-ler', 'mailer', 'maler'];
+const WAKE_WORDS = [
+  'mayler', 'may-ler', 'may ler', 'maylar', 'maylor',
+  'hey mayler', 'hey may-ler', 'hey maylar', 'hey maylor',
+  'mailer', 'maler', 'miller', 'my ler', 'my lor'
+];
 const TERMINATION_WORDS = ['goodbye', 'stop listening', 'that\'s all', 'thank you mayler', 'thanks mayler', 'bye mayler'];
 const SHUTDOWN_WORDS = ['shutdown', 'shut down', 'turn off'];
-const wakeThreshold = 0.4; // Lowered for better detection
+const wakeThreshold = 0.3; // Lower threshold for easier detection
 const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
 
 // Smooth transcript display
@@ -224,13 +228,8 @@ const WebRTCApp: React.FC = () => {
         setGoogleStatus('available');
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
-        // Automatically open OAuth window on first load if not authenticated
-        const status = await fetch('/api/gmail/status').then(r => r.json()).catch(() => ({ authenticated: false }));
-        if (!status.authenticated) {
-          triggerGoogleAuth();
-        }
       }
+      // Don't auto-trigger OAuth - only open when user requests Gmail access
     };
 
     initAuth();
@@ -905,8 +904,11 @@ IMPORTANT LISTENING BEHAVIOR:
   // Wake Word Logic
   const detectWakeWord = useCallback((transcript: string) => {
     const lower = sanitize(transcript);
+    console.log('[Wake Word] Heard:', transcript, '→ Sanitized:', lower);
     for (const word of WAKE_WORDS) {
-      if (lower.includes(word) || similarity(lower, word) > wakeThreshold) {
+      const sim = similarity(lower, word);
+      if (lower.includes(word) || sim > wakeThreshold) {
+        console.log(`[Wake Word] MATCH! "${word}" (similarity: ${(sim * 100).toFixed(1)}%)`);
         return true;
       }
     }
@@ -980,7 +982,7 @@ IMPORTANT LISTENING BEHAVIOR:
         const transcript = results[idx][0].transcript;
         const isFinal = results[idx].isFinal;
 
-        if (isFinal || results[idx][0].confidence > 0.7) {
+        if (isFinal || results[idx][0].confidence > 0.5) {
           if (detectWakeWord(transcript)) {
             console.log('[Wake Word] Wake word detected, entering command mode');
             setIsWakeMode(false); // Enter command mode
