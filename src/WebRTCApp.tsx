@@ -75,8 +75,8 @@ const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace
 // Liquid Glass Orb Component
 const LiquidOrb: React.FC<{
   state: 'idle' | 'listening' | 'thinking' | 'speaking';
-  audioLevel: number;
-}> = ({ state, audioLevel }) => {
+  audioLevel?: number;
+}> = ({ state, audioLevel = 0 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const timeRef = useRef<number>(0);
@@ -329,7 +329,7 @@ const WebRTCApp: React.FC = () => {
     };
   }, []);
 
-  // Check Google Status and handle OAuth callback
+  // Check Google Status
   const checkGoogleStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/status');
@@ -342,7 +342,7 @@ const WebRTCApp: React.FC = () => {
     }
   }, []);
 
-  // PWA-compatible OAuth trigger
+  // PWA-compatible OAuth trigger - defined before useEffect
   const triggerGoogleAuth = useCallback(async () => {
     console.log('[OAuth] triggerGoogleAuth called');
     try {
@@ -380,6 +380,7 @@ const WebRTCApp: React.FC = () => {
     }
   }, []);
 
+  // Handle OAuth callback - now defined after triggerGoogleAuth
   useEffect(() => {
     const initAuth = async () => {
       await checkGoogleStatus();
@@ -781,15 +782,18 @@ const WebRTCApp: React.FC = () => {
           shouldGreetOnConnectRef.current = false;
           // Wait for session to be configured before greeting
           setTimeout(() => {
-            sendEvent({
-              type: 'conversation.item.create',
-              item: {
-                type: 'message',
-                role: 'user',
-                content: [{ type: 'input_text', text: 'Hey Maylah' }],
-              },
-            });
-            sendEvent({ type: 'response.create' });
+            // Safety check: ensure data channel is still open
+            if (dcRef.current && dcRef.current.readyState === 'open') {
+              sendEvent({
+                type: 'conversation.item.create',
+                item: {
+                  type: 'message',
+                  role: 'user',
+                  content: [{ type: 'input_text', text: 'Hey Maylah' }],
+                },
+              });
+              sendEvent({ type: 'response.create' });
+            }
           }, 500);
         }
       };
