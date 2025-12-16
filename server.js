@@ -5,9 +5,6 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import GmailService from './backend/gmail-service.js';
-import SearchService from './backend/search-service.js';
-import UtilityService from './backend/utility-service.js';
-import GeminiService from './backend/gemini-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -19,11 +16,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize services
+// Initialize Gmail service
 const gmailService = new GmailService();
-const searchService = new SearchService();
-const utilityService = new UtilityService();
-const geminiService = new GeminiService();
 
 // Initialize Gmail service
 let gmailAvailable = false;
