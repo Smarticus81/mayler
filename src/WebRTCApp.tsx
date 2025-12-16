@@ -75,8 +75,8 @@ const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace
 // Liquid Glass Orb Component
 const LiquidOrb: React.FC<{
   state: 'idle' | 'listening' | 'thinking' | 'speaking';
-  audioLevel?: number;
-}> = ({ state, audioLevel = 0 }) => {
+  audioLevel: number;
+}> = ({ state, audioLevel }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | undefined>(undefined);
   const timeRef = useRef<number>(0);
@@ -111,7 +111,7 @@ const LiquidOrb: React.FC<{
       let waveSpeed = 0.8;
       let glowIntensity = 0.2;
       let primaryHue = 350; // Soft rose/pink
-      let secondarHue = 190; // Soft blue-grey
+      let secondaryHue = 190; // Soft blue-grey
 
       switch (state) {
         case 'listening':
@@ -342,29 +342,6 @@ const WebRTCApp: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const initAuth = async () => {
-      await checkGoogleStatus();
-
-      // Handle OAuth callback for PWA
-      const urlParams = new URLSearchParams(window.location.search);
-      const authSuccess = urlParams.get('auth_success');
-      if (authSuccess === 'true') {
-        setGoogleStatus('available');
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else {
-        // Automatically open OAuth window on first load if not authenticated
-        const status = await fetch('/api/gmail/status').then(r => r.json()).catch(() => ({ authenticated: false }));
-        if (!status.authenticated) {
-          triggerGoogleAuth();
-        }
-      }
-    };
-
-    initAuth();
-  }, [checkGoogleStatus, triggerGoogleAuth]);
-
   // PWA-compatible OAuth trigger
   const triggerGoogleAuth = useCallback(async () => {
     console.log('[OAuth] triggerGoogleAuth called');
@@ -402,6 +379,29 @@ const WebRTCApp: React.FC = () => {
       setError('Failed to initiate Google authentication');
     }
   }, []);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      await checkGoogleStatus();
+
+      // Handle OAuth callback for PWA
+      const urlParams = new URLSearchParams(window.location.search);
+      const authSuccess = urlParams.get('auth_success');
+      if (authSuccess === 'true') {
+        setGoogleStatus('available');
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else {
+        // Automatically open OAuth window on first load if not authenticated
+        const status = await fetch('/api/gmail/status').then(r => r.json()).catch(() => ({ authenticated: false }));
+        if (!status.authenticated) {
+          triggerGoogleAuth();
+        }
+      }
+    };
+
+    initAuth();
+  }, [checkGoogleStatus, triggerGoogleAuth]);
 
   const pushMessage = useCallback((msg: Omit<ChatMessage, 'id'>) => {
     setMessages((prev) => {
