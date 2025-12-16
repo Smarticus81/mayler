@@ -256,6 +256,38 @@ body {
   box-shadow: var(--shadow-medium);
 }
 
+.voice-select {
+  padding: 10px 16px;
+  background: var(--glass-bg);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+  box-shadow: var(--shadow-soft);
+  border: none;
+  outline: none;
+  min-width: 200px;
+}
+
+.voice-select:hover {
+  background: var(--glass-highlight);
+  box-shadow: var(--shadow-medium);
+  transform: translateY(-2px);
+}
+
+.voice-select:focus {
+  box-shadow: var(--shadow-medium);
+  background: var(--glass-highlight);
+}
+
+.voice-select option {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 10px;
+}
+
 .close-settings {
   width: 100%;
   margin-top: 28px;

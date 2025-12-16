@@ -1057,6 +1057,29 @@ IMPORTANT LISTENING BEHAVIOR:
             </div>
 
             <div className="setting-item">
+              <span>Voice Style</span>
+              <select
+                className="voice-select"
+                value={selectedVoice}
+                onChange={(e) => {
+                  const newVoice = e.target.value as typeof selectedVoice;
+                  setSelectedVoice(newVoice);
+                  // Reconfigure session with new voice if connected
+                  if (connected) {
+                    configureSession();
+                  }
+                }}
+              >
+                <option value="alloy">Alloy - Balanced and neutral</option>
+                <option value="echo">Echo - Warm and friendly</option>
+                <option value="fable">Fable - Expressive and dynamic</option>
+                <option value="onyx">Onyx - Deep and authoritative</option>
+                <option value="nova">Nova - Bright and energetic</option>
+                <option value="shimmer">Shimmer - Soft and gentle</option>
+              </select>
+            </div>
+
+            <div className="setting-item">
               <span>Google Account</span>
               <button
                 className={`toggle-btn ${googleStatus === 'available' ? 'active' : ''}`}
