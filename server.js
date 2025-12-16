@@ -747,5 +747,4 @@ app.get('*', (req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`Mayler server running on port ${PORT}`);
-  geminiService.initialize(server);
 });
