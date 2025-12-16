@@ -574,6 +574,44 @@ body {
   height: 28px;
 }
 
+.shutdown-btn {
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.4s var(--ease-smooth);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-soft);
+  border: none;
+  margin-left: 16px;
+}
+
+.shutdown-btn:hover {
+  background: var(--glass-highlight);
+  color: var(--error);
+  transform: scale(1.05);
+  box-shadow: var(--shadow-medium);
+}
+
+.shutdown-btn.shutdown {
+  background: linear-gradient(135deg, rgba(216, 168, 168, 0.4), rgba(216, 168, 168, 0.2));
+  color: var(--error);
+  box-shadow:
+    var(--shadow-medium),
+    0 0 20px rgba(216, 168, 168, 0.3);
+}
+
+.shutdown-btn svg {
+  width: 24px;
+  height: 24px;
+}
+
 @media (max-width: 768px) {
   .brand-name {
     font-size: 24px;
@@ -596,5 +634,16 @@ body {
   .main-btn svg {
     width: 24px;
     height: 24px;
+  }
+
+  .shutdown-btn {
+    width: 56px;
+    height: 56px;
+    margin-left: 12px;
+  }
+
+  .shutdown-btn svg {
+    width: 20px;
+    height: 20px;
   }
 }

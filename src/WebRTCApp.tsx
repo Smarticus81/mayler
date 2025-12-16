@@ -236,6 +236,20 @@ const WebRTCApp: React.FC = () => {
     initAuth();
   }, [checkGoogleStatus, triggerGoogleAuth]);
 
+  // Auto-start wake word detection on mount
+  useEffect(() => {
+    if (wakeWordEnabled) {
+      console.log('[Wake Word] Auto-starting wake word detection');
+      startWakeRecognition();
+    }
+
+    return () => {
+      console.log('[Wake Word] Cleanup - stopping wake word detection');
+      stopWakeRecognition();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - run once on mount, cleanup on unmount
+
   const pushMessage = useCallback((msg: Omit<ChatMessage, 'id'>) => {
     setMessages((prev) => {
       const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -717,6 +731,27 @@ IMPORTANT LISTENING BEHAVIOR:
           if (text.trim()) {
             setTranscript(text);
             pushMessage({ type: 'user', text });
+
+            // Check for termination words (return to wake mode)
+            if (detectTerminationWord(text)) {
+              console.log('[Termination] Detected, returning to wake word mode');
+              setIsWakeMode(true);
+              disconnectFromOpenAIRealtime();
+              if (wakeWordEnabled) {
+                setTimeout(() => startWakeRecognition(), 500);
+              }
+              return;
+            }
+
+            // Check for shutdown words (complete shutdown)
+            if (detectShutdownWord(text)) {
+              console.log('[Shutdown] Detected, stopping all listening');
+              setIsWakeMode(true);
+              setWakeWordEnabled(false);
+              disconnectFromOpenAIRealtime();
+              stopWakeRecognition();
+              return;
+            }
           }
           setInterimTranscript('');
           return;
@@ -947,6 +982,8 @@ IMPORTANT LISTENING BEHAVIOR:
 
         if (isFinal || results[idx][0].confidence > 0.7) {
           if (detectWakeWord(transcript)) {
+            console.log('[Wake Word] Wake word detected, entering command mode');
+            setIsWakeMode(false); // Enter command mode
             stopWakeRecognition();
             handleStartListening();
           }
@@ -1197,6 +1234,32 @@ IMPORTANT LISTENING BEHAVIOR:
             </svg>
           </button>
         )}
+
+        {/* Manual shutdown button */}
+        <button
+          className={`shutdown-btn ${!wakeWordEnabled ? 'shutdown' : ''}`}
+          onClick={() => {
+            if (wakeWordEnabled) {
+              // Shutdown
+              console.log('[Manual] Shutdown triggered');
+              setWakeWordEnabled(false);
+              setIsWakeMode(true);
+              disconnectFromOpenAIRealtime();
+              stopWakeRecognition();
+            } else {
+              // Restart
+              console.log('[Manual] Restarting wake word detection');
+              setWakeWordEnabled(true);
+              startWakeRecognition();
+            }
+          }}
+          aria-label={wakeWordEnabled ? 'Shutdown' : 'Restart'}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+            <line x1="12" y1="2" x2="12" y2="12" />
+          </svg>
+        </button>
       </div>
 
       {/* Remote audio element (OpenAI realtime output) */}
