@@ -69,7 +69,9 @@ const similarity = (a: string, b: string) => {
 };
 
 const WAKE_WORDS = ['mayler', 'may-ler', 'may ler', 'hey mayler', 'hey may-ler', 'mailer', 'maler'];
-const wakeThreshold = 0.6;
+const TERMINATION_WORDS = ['goodbye', 'stop listening', 'that\'s all', 'thank you mayler', 'thanks mayler', 'bye mayler'];
+const SHUTDOWN_WORDS = ['shutdown', 'shut down', 'turn off'];
+const wakeThreshold = 0.4; // Lowered for better detection
 const sanitize = (s: string) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
 
 // Smooth transcript display
@@ -113,6 +115,8 @@ const WebRTCApp: React.FC = () => {
   const [googleStatus, setGoogleStatus] = useState<'unknown' | 'available' | 'unavailable'>('unknown');
   const [showSettings, setShowSettings] = useState(false);
   const [showAudioHint, setShowAudioHint] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'>('alloy');
+  const [isWakeMode, setIsWakeMode] = useState(true); // true = wake word mode, false = command mode
 
   // Refs
   const audioContextRef = useRef<AudioContext | null>(null);
