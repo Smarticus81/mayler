@@ -779,7 +779,6 @@ const WebRTCApp: React.FC = () => {
         configureSession();
         if (shouldGreetOnConnectRef.current) {
           shouldGreetOnConnectRef.current = false;
-<<<<<<< HEAD
           // Wait for session to be configured before greeting
           setTimeout(() => {
             sendEvent({
@@ -792,17 +791,6 @@ const WebRTCApp: React.FC = () => {
             });
             sendEvent({ type: 'response.create' });
           }, 500);
-=======
-          sendEvent({
-            type: 'conversation.item.create',
-            item: {
-              type: 'message',
-              role: 'user',
-              content: [{ type: 'input_text', text: 'Hey Mayler' }],
-            },
-          });
-          sendEvent({ type: 'response.create' });
->>>>>>> 6ff23402cc3b46bede5412de6539cdf4c39ca69b
         }
       };
 
