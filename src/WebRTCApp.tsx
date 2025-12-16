@@ -456,7 +456,12 @@ const WebRTCApp: React.FC = () => {
       type: 'session.update',
       session: {
         type: 'realtime',
-        instructions: `You are mayler, a laid-back but professional AI assistant. You're calm, collected, and genuinely helpful without being overly enthusiastic. Think of yourself as a knowledgeable friend who happens to be really good at getting things done. You speak naturally, use casual language when appropriate, but maintain professionalism when handling important tasks. You don't use excessive exclamation points or overly cheerful language. You're confident, direct, and occasionally have a dry sense of humor. When helping with tasks, you're thorough but not verbose.`,
+        instructions: `You are mayler, a laid-back but professional AI assistant. You're calm, collected, and genuinely helpful without being overly enthusiastic. Think of yourself as a knowledgeable friend who happens to be really good at getting things done. You speak naturally, use casual language when appropriate, but maintain professionalism when handling important tasks. You don't use excessive exclamation points or overly cheerful language. You're confident, direct, and occasionally have a dry sense of humor. When helping with tasks, you're thorough but not verbose.
+
+IMPORTANT LISTENING BEHAVIOR:
+- When the user says "goodbye", "stop listening", "that's all", "thank you mayler", "thanks mayler", or "bye mayler", acknowledge briefly and then the system will return to wake word mode.
+- If the user says "shutdown", "shut down", or "turn off", acknowledge that you're shutting down completely.
+- Stay in continuous listening mode - don't end the conversation unless the user explicitly uses one of the termination phrases above.`,
         output_modalities: ['audio'],
         audio: {
           input: {
@@ -469,7 +474,7 @@ const WebRTCApp: React.FC = () => {
             },
           },
           output: {
-            voice: 'alloy',
+            voice: selectedVoice,
           },
         },
         tools: [
@@ -531,7 +536,7 @@ const WebRTCApp: React.FC = () => {
         ],
       },
     });
-  }, [sendEvent]);
+  }, [sendEvent, selectedVoice]);
 
   const startRemoteAudioLevelMeter = useCallback(() => {
     if (!remoteStreamRef.current) return;
@@ -867,6 +872,28 @@ const WebRTCApp: React.FC = () => {
     const lower = sanitize(transcript);
     for (const word of WAKE_WORDS) {
       if (lower.includes(word) || similarity(lower, word) > wakeThreshold) {
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  const detectTerminationWord = useCallback((transcript: string) => {
+    const lower = sanitize(transcript);
+    for (const word of TERMINATION_WORDS) {
+      if (lower.includes(word) || similarity(lower, word) > 0.7) {
+        console.log(`Termination word detected: "${transcript}" matched "${word}"`);
+        return true;
+      }
+    }
+    return false;
+  }, []);
+
+  const detectShutdownWord = useCallback((transcript: string) => {
+    const lower = sanitize(transcript);
+    for (const word of SHUTDOWN_WORDS) {
+      if (lower.includes(word) || similarity(lower, word) > 0.7) {
+        console.log(`Shutdown word detected: "${transcript}" matched "${word}"`);
         return true;
       }
     }
