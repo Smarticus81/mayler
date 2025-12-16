@@ -102,12 +102,12 @@ const WebRTCApp: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [audioLevel, setAudioLevel] = useState(0);
+  const [_audioLevel, setAudioLevel] = useState(0);
   const [transcript, setTranscript] = useState(''); // latest user final
   const [interimTranscript, setInterimTranscript] = useState(''); // latest user interim
   const [agentTranscript, setAgentTranscript] = useState(''); // latest agent final
   const [agentInterimTranscript, setAgentInterimTranscript] = useState(''); // latest agent interim
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [_messages, setMessages] = useState<ChatMessage[]>([]);
 
   const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
   const [googleStatus, setGoogleStatus] = useState<'unknown' | 'available' | 'unavailable'>('unknown');
