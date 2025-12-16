@@ -1054,7 +1054,15 @@ IMPORTANT LISTENING BEHAVIOR:
         )}
         <div className={`status-indicator ${connected ? 'connected' : ''}`}>
           <span className="status-dot" />
-          <span className="status-text">{connected ? 'Connected' : 'Ready'}</span>
+          <span className="status-text">
+            {!wakeWordEnabled
+              ? 'Shutdown'
+              : isWakeMode
+                ? 'Wake Mode'
+                : connected
+                  ? 'Command Mode'
+                  : 'Ready'}
+          </span>
         </div>
         <button
           className="settings-btn"
