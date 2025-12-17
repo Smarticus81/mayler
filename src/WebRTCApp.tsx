@@ -471,6 +471,11 @@ const WebRTCApp: React.FC = () => {
         type: 'realtime',
         instructions: `You are mayler, a laid-back but professional AI assistant. You're calm, collected, and genuinely helpful without being overly enthusiastic. Think of yourself as a knowledgeable friend who happens to be really good at getting things done. You speak naturally, use casual language when appropriate, but maintain professionalism when handling important tasks. You don't use excessive exclamation points or overly cheerful language. You're confident, direct, and occasionally have a dry sense of humor. When helping with tasks, you're thorough but not verbose.
 
+IMPORTANT RESPONSE BEHAVIOR:
+- Respond IMMEDIATELY when the user speaks. Don't wait or hesitate.
+- Start speaking as soon as you understand the request.
+- Be concise and direct in your initial response.
+
 IMPORTANT LISTENING BEHAVIOR:
 - When the user says "goodbye", "stop listening", "that's all", "thank you mayler", "thanks mayler", or "bye mayler", acknowledge briefly and then the system will return to wake word mode.
 - If the user says "shutdown", "shut down", or "turn off", acknowledge that you're shutting down completely.
@@ -481,9 +486,9 @@ IMPORTANT LISTENING BEHAVIOR:
             transcription: { model: 'gpt-4o-mini-transcribe' },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 600,
+              threshold: 0.4,
+              prefix_padding_ms: 200,
+              silence_duration_ms: 400,
             },
           },
           output: {
@@ -935,7 +940,7 @@ IMPORTANT LISTENING BEHAVIOR:
       }
     }
 
-    shouldGreetOnConnectRef.current = true;
+    shouldGreetOnConnectRef.current = false; // Disable auto-greeting for faster TTFT
     connectToOpenAIRealtime();
   }, [connectToOpenAIRealtime]);
 
