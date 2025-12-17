@@ -431,7 +431,7 @@ body {
   left: 15%;
   width: 30%;
   height: 30%;
-  \n background: radial-gradient(circle at 30% 30%,
+  background: radial-gradient(circle at 30% 30%,
       rgba(255, 255, 255, 0.5),
       rgba(255, 255, 255, 0.2) 40%,
       transparent 70%);
