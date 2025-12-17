@@ -431,6 +431,102 @@ const WebRTCApp: React.FC = () => {
         });
         return await safeJson(resp);
       }
+      case 'delete_email': {
+        const resp = await fetch('/api/gmail/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailId: a.emailId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'mark_email_read': {
+        const resp = await fetch('/api/gmail/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailId: a.emailId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'mark_email_unread': {
+        const resp = await fetch('/api/gmail/mark-unread', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailId: a.emailId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'star_email': {
+        const resp = await fetch('/api/gmail/star', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailId: a.emailId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'archive_email': {
+        const resp = await fetch('/api/gmail/archive', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emailId: a.emailId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'update_calendar_event': {
+        const resp = await fetch('/api/calendar/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(a),
+        });
+        return await safeJson(resp);
+      }
+      case 'delete_calendar_event': {
+        const resp = await fetch('/api/calendar/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventId: a.eventId }),
+        });
+        return await safeJson(resp);
+      }
+      case 'get_news': {
+        const resp = await fetch('/api/news', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ category: a.category, country: a.country }),
+        });
+        return await safeJson(resp);
+      }
+      case 'convert_currency': {
+        const resp = await fetch('/api/currency', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: a.amount, from: a.from, to: a.to }),
+        });
+        return await safeJson(resp);
+      }
+      case 'translate_text': {
+        const resp = await fetch('/api/translate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: a.text, targetLanguage: a.targetLang, sourceLanguage: a.sourceLang }),
+        });
+        return await safeJson(resp);
+      }
+      case 'set_timer': {
+        const resp = await fetch('/api/timer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration: a.duration, label: a.label }),
+        });
+        return await safeJson(resp);
+      }
+      case 'create_note': {
+        const resp = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: a.title, content: a.content }),
+        });
+        return await safeJson(resp);
+      }
       default:
         return { error: `Unknown tool: ${name}` };
     }

@@ -5,6 +5,8 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
 import GmailService from './backend/gmail-service.js';
+import UtilityService from './backend/utility-service.js';
+import SearchService from './backend/search-service.js';
 
 // Load environment variables
 dotenv.config();
@@ -16,8 +18,10 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Initialize Gmail service
+// Initialize services
 const gmailService = new GmailService();
+const utilityService = new UtilityService();
+const searchService = new SearchService();
 
 // Initialize Gmail service
 let gmailAvailable = false;
@@ -29,6 +33,8 @@ gmailService.initialize().then(available => {
     console.log('Gmail service not available (missing credentials or token)');
   }
 });
+
+console.log('Utility and Search services initialized');
 
 // Enable CORS for all routes
 app.use(cors());
@@ -363,6 +369,71 @@ app.delete('/api/gmail/email/:id', async (req, res) => {
   }
 });
 
+// Delete email (POST method for AI tool calls)
+app.post('/api/gmail/delete', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Gmail not authenticated' });
+    const { emailId, permanent = false } = req.body;
+    if (!emailId) return res.status(400).json({ error: 'Email ID required' });
+    const result = await gmailService.deleteEmail(emailId, permanent);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark email as read
+app.post('/api/gmail/mark-read', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Gmail not authenticated' });
+    const { emailId } = req.body;
+    if (!emailId) return res.status(400).json({ error: 'Email ID required' });
+    const result = await gmailService.markEmailRead(emailId);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Mark email as unread
+app.post('/api/gmail/mark-unread', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Gmail not authenticated' });
+    const { emailId } = req.body;
+    if (!emailId) return res.status(400).json({ error: 'Email ID required' });
+    const result = await gmailService.markEmailUnread(emailId);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Star email
+app.post('/api/gmail/star', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Gmail not authenticated' });
+    const { emailId } = req.body;
+    if (!emailId) return res.status(400).json({ error: 'Email ID required' });
+    const result = await gmailService.starEmail(emailId);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Archive email
+app.post('/api/gmail/archive', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Gmail not authenticated' });
+    const { emailId } = req.body;
+    if (!emailId) return res.status(400).json({ error: 'Email ID required' });
+    const result = await gmailService.archiveEmail(emailId);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Reply to email
 app.post('/api/gmail/reply/:id', async (req, res) => {
   try {
@@ -422,6 +493,54 @@ app.post('/api/calendar/action-item', async (req, res) => {
     if (!gmailAvailable) return res.status(503).json({ error: 'Google not authenticated' });
     const { actionItem, dueDate, priority = 'medium' } = req.body;
     const result = await gmailService.addActionItemToCalendar(actionItem, dueDate, priority);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update calendar event
+app.put('/api/calendar/events/:id', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Google not authenticated' });
+    const result = await gmailService.updateCalendarEvent(req.params.id, req.body);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Update calendar event (POST for AI tool calls)
+app.post('/api/calendar/update', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Google not authenticated' });
+    const { eventId, ...updates } = req.body;
+    if (!eventId) return res.status(400).json({ error: 'Event ID required' });
+    const result = await gmailService.updateCalendarEvent(eventId, updates);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete calendar event
+app.delete('/api/calendar/events/:id', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Google not authenticated' });
+    const result = await gmailService.deleteCalendarEvent(req.params.id);
+    res.json({ success: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete calendar event (POST for AI tool calls)
+app.post('/api/calendar/delete', async (req, res) => {
+  try {
+    if (!gmailAvailable) return res.status(503).json({ error: 'Google not authenticated' });
+    const { eventId } = req.body;
+    if (!eventId) return res.status(400).json({ error: 'Event ID required' });
+    const result = await gmailService.deleteCalendarEvent(eventId);
     res.json({ success: true, result });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -567,11 +686,58 @@ app.post('/api/time', async (req, res) => {
   }
 });
 
+// Currency conversion
+app.post('/api/currency', async (req, res) => {
+  try {
+    const { amount, from, to } = req.body;
+    if (amount === undefined || !from || !to) return res.status(400).json({ error: 'Amount, from, and to required' });
+    const result = await utilityService.convertCurrency(amount, from, to);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Timer
+app.post('/api/timer', async (req, res) => {
+  try {
+    const { duration, label } = req.body;
+    if (!duration) return res.status(400).json({ error: 'Duration required' });
+    const result = utilityService.setTimer(duration, label);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Notes
+app.post('/api/notes', async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    if (!content) return res.status(400).json({ error: 'Content required' });
+    const result = utilityService.createNote(title, content);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// News endpoint
+app.post('/api/news', async (req, res) => {
+  try {
+    const { category = 'technology', country = 'us', maxResults = 5 } = req.body;
+    const result = await searchService.getNews(category, maxResults);
+    res.json({ articles: result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post('/api/search/images', async (req, res) => {
   try {
     const { query, maxResults = 5 } = req.body;
     if (!query) return res.status(400).json({ error: 'Query required' });
-    const result = await utilityService.searchImages(query, maxResults);
+    const result = await searchService.searchImages(query, maxResults);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -582,7 +748,7 @@ app.post('/api/search/videos', async (req, res) => {
   try {
     const { query, maxResults = 5 } = req.body;
     if (!query) return res.status(400).json({ error: 'Query required' });
-    const result = await utilityService.searchVideos(query, maxResults);
+    const result = await searchService.searchVideos(query, maxResults);
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -593,7 +759,7 @@ app.post('/api/search/advanced', async (req, res) => {
   try {
     const { query, timeRange, site, maxResults } = req.body;
     if (!query) return res.status(400).json({ error: 'Query required' });
-    const result = await utilityService.advancedWebSearch(query, { timeRange, site, maxResults });
+    const result = await searchService.advancedWebSearch(query, { timeRange, site, maxResults });
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });

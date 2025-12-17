@@ -381,6 +381,90 @@ class GmailService {
     }
   }
 
+  async markEmailRead(emailId) {
+    if (!this.gmail) {
+      throw new Error('Gmail not authenticated');
+    }
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: ['UNREAD']
+        }
+      });
+
+      return { success: true, id: emailId, action: 'marked_read' };
+    } catch (error) {
+      console.error('Failed to mark email as read:', error);
+      throw new Error('Failed to mark email as read');
+    }
+  }
+
+  async markEmailUnread(emailId) {
+    if (!this.gmail) {
+      throw new Error('Gmail not authenticated');
+    }
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['UNREAD']
+        }
+      });
+
+      return { success: true, id: emailId, action: 'marked_unread' };
+    } catch (error) {
+      console.error('Failed to mark email as unread:', error);
+      throw new Error('Failed to mark email as unread');
+    }
+  }
+
+  async starEmail(emailId) {
+    if (!this.gmail) {
+      throw new Error('Gmail not authenticated');
+    }
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['STARRED']
+        }
+      });
+
+      return { success: true, id: emailId, action: 'starred' };
+    } catch (error) {
+      console.error('Failed to star email:', error);
+      throw new Error('Failed to star email');
+    }
+  }
+
+  async archiveEmail(emailId) {
+    if (!this.gmail) {
+      throw new Error('Gmail not authenticated');
+    }
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: ['INBOX']
+        }
+      });
+
+      return { success: true, id: emailId, action: 'archived' };
+    } catch (error) {
+      console.error('Failed to archive email:', error);
+      throw new Error('Failed to archive email');
+    }
+  }
+
   async replyToEmail(emailId, text, html) {
     if (!this.gmail) {
       throw new Error('Gmail not authenticated');
@@ -558,12 +642,91 @@ class GmailService {
     const end = new Date(start.getTime() + 30 * 60000); // 30 minutes duration
 
     return await this.createCalendarEvent({
-      summary: `📋 Action: ${actionItem}`,
-      description: `Priority: ${priority}\n\nAction item created by Ti-Sang voice assistant.`,
+      summary: `Action: ${actionItem}`,
+      description: `Priority: ${priority}\n\nAction item created by Mayler voice assistant.`,
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() },
       reminders: reminderMinutes.map(minutes => ({ method: 'popup', minutes }))
     });
+  }
+
+  async updateCalendarEvent(eventId, updates) {
+    if (!this.calendar) {
+      throw new Error('Calendar not authenticated');
+    }
+
+    try {
+      // First get the existing event
+      const existing = await this.calendar.events.get({
+        calendarId: 'primary',
+        eventId: eventId
+      });
+
+      const event = existing.data;
+
+      // Apply updates
+      if (updates.summary) event.summary = updates.summary;
+      if (updates.description) event.description = updates.description;
+      if (updates.location) event.location = updates.location;
+      
+      if (updates.start) {
+        if (typeof updates.start === 'string') {
+          event.start = { dateTime: updates.start, timeZone: event.start?.timeZone || 'America/Los_Angeles' };
+        } else {
+          event.start = updates.start;
+        }
+      }
+      
+      if (updates.end) {
+        if (typeof updates.end === 'string') {
+          event.end = { dateTime: updates.end, timeZone: event.end?.timeZone || 'America/Los_Angeles' };
+        } else {
+          event.end = updates.end;
+        }
+      }
+
+      if (updates.attendees) {
+        event.attendees = updates.attendees.map(email => 
+          typeof email === 'string' ? { email } : email
+        );
+      }
+
+      const result = await this.calendar.events.update({
+        calendarId: 'primary',
+        eventId: eventId,
+        requestBody: event
+      });
+
+      return {
+        success: true,
+        id: result.data.id,
+        htmlLink: result.data.htmlLink,
+        summary: result.data.summary,
+        start: result.data.start,
+        end: result.data.end
+      };
+    } catch (error) {
+      console.error('Failed to update calendar event:', error);
+      throw new Error('Failed to update calendar event: ' + error.message);
+    }
+  }
+
+  async deleteCalendarEvent(eventId) {
+    if (!this.calendar) {
+      throw new Error('Calendar not authenticated');
+    }
+
+    try {
+      await this.calendar.events.delete({
+        calendarId: 'primary',
+        eventId: eventId
+      });
+
+      return { success: true, id: eventId, action: 'deleted' };
+    } catch (error) {
+      console.error('Failed to delete calendar event:', error);
+      throw new Error('Failed to delete calendar event: ' + error.message);
+    }
   }
 }
 
