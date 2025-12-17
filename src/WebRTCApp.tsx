@@ -491,61 +491,47 @@ IMPORTANT LISTENING BEHAVIOR:
           },
         },
         tools: [
+          // Google OAuth
           { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
-          {
-            type: 'function',
-            name: 'create_calendar_event',
-            description: "Creates a new event in the user's Google Calendar.",
-            parameters: {
-              type: 'object',
-              properties: {
-                summary: { type: 'string', description: 'Title of the event' },
-                description: { type: 'string', description: 'Description or details of the event' },
-                start: { type: 'string', description: 'Start time in ISO 8601 format' },
-                end: { type: 'string', description: 'End time in ISO 8601 format' },
-                location: { type: 'string', description: 'Location of the event' },
-                attendees: { type: 'array', items: { type: 'string' }, description: 'List of email addresses to invite' },
-              },
-              required: ['summary', 'start', 'end'],
-            },
-          },
-          {
-            type: 'function',
-            name: 'list_calendar_events',
-            description: "Lists upcoming events from the user's calendar.",
-            parameters: {
-              type: 'object',
-              properties: {
-                maxResults: { type: 'number', description: 'Maximum number of events to return (default 10)' },
-                timeMin: { type: 'string', description: 'Start time to list events from (ISO 8601)' },
-                timeMax: { type: 'string', description: 'End time to list events to (ISO 8601)' },
-                query: { type: 'string', description: 'Free text search terms to filter events' },
-              },
-            },
-          },
+
+          // Gmail CRUD Operations
           { type: 'function', name: 'get_emails', description: "Retrieves recent emails from the user's Gmail inbox.", parameters: { type: 'object', properties: { maxResults: { type: 'number' } } } },
-          {
-            type: 'function',
-            name: 'search_emails',
-            description: 'Searches emails in Gmail with a query.',
-            parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] },
-          },
-          {
-            type: 'function',
-            name: 'send_email',
-            description: 'Sends an email via Gmail.',
-            parameters: { type: 'object', properties: { to: { type: 'string' }, subject: { type: 'string' }, text: { type: 'string' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] },
-          },
+          { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
+          { type: 'function', name: 'send_email', description: 'Sends an email via Gmail.', parameters: { type: 'object', properties: { to: { type: 'string' }, subject: { type: 'string' }, text: { type: 'string' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] } },
+          { type: 'function', name: 'delete_email', description: 'Permanently deletes an email.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+          { type: 'function', name: 'mark_email_read', description: 'Marks an email as read.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+          { type: 'function', name: 'mark_email_unread', description: 'Marks an email as unread.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+          { type: 'function', name: 'star_email', description: 'Stars an email.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+          { type: 'function', name: 'archive_email', description: 'Archives an email (removes from inbox).', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+
+          // Calendar CRUD Operations
+          { type: 'function', name: 'create_calendar_event', description: "Creates a new event in the user's Google Calendar.", parameters: { type: 'object', properties: { summary: { type: 'string', description: 'Title of the event' }, description: { type: 'string', description: 'Description or details of the event' }, start: { type: 'string', description: 'Start time in ISO 8601 format' }, end: { type: 'string', description: 'End time in ISO 8601 format' }, location: { type: 'string', description: 'Location of the event' }, attendees: { type: 'array', items: { type: 'string' }, description: 'List of email addresses to invite' } }, required: ['summary', 'start', 'end'] } },
+          { type: 'function', name: 'list_calendar_events', description: "Lists upcoming events from the user's calendar.", parameters: { type: 'object', properties: { maxResults: { type: 'number', description: 'Maximum number of events to return (default 10)' }, timeMin: { type: 'string', description: 'Start time to list events from (ISO 8601)' }, timeMax: { type: 'string', description: 'End time to list events to (ISO 8601)' }, query: { type: 'string', description: 'Free text search terms to filter events' } } } },
+          { type: 'function', name: 'update_calendar_event', description: 'Updates an existing calendar event.', parameters: { type: 'object', properties: { eventId: { type: 'string' }, summary: { type: 'string' }, description: { type: 'string' }, start: { type: 'string' }, end: { type: 'string' }, location: { type: 'string' } }, required: ['eventId'] } },
+          { type: 'function', name: 'delete_calendar_event', description: 'Deletes a calendar event.', parameters: { type: 'object', properties: { eventId: { type: 'string' } }, required: ['eventId'] } },
+          { type: 'function', name: 'set_reminder', description: 'Creates a reminder as a calendar event.', parameters: { type: 'object', properties: { title: { type: 'string' }, dateTime: { type: 'string' }, priority: { type: 'string' } }, required: ['title', 'dateTime'] } },
+
+          // Web & Information
           { type: 'function', name: 'web_search', description: 'Searches the web for information.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
+          { type: 'function', name: 'get_news', description: 'Gets latest news headlines.', parameters: { type: 'object', properties: { category: { type: 'string', description: 'News category (e.g., technology, business, sports)' }, country: { type: 'string', description: 'Country code (e.g., us, uk)' } } } },
           { type: 'function', name: 'get_weather', description: 'Gets current weather for a location.', parameters: { type: 'object', properties: { location: { type: 'string' }, units: { type: 'string' } }, required: ['location'] } },
+          { type: 'function', name: 'wikipedia_search', description: 'Searches Wikipedia for information on a topic.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+          { type: 'function', name: 'get_definition', description: 'Gets the dictionary definition of a word.', parameters: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] } },
+
+          // Data & Calculations
           { type: 'function', name: 'calculate', description: 'Performs mathematical calculations.', parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] } },
+          { type: 'function', name: 'convert_units', description: 'Converts between units of measurement.', parameters: { type: 'object', properties: { value: { type: 'number' }, from: { type: 'string' }, to: { type: 'string' } }, required: ['value', 'from', 'to'] } },
+          { type: 'function', name: 'convert_currency', description: 'Converts between currencies.', parameters: { type: 'object', properties: { amount: { type: 'number' }, from: { type: 'string', description: 'Source currency code (e.g., USD)' }, to: { type: 'string', description: 'Target currency code (e.g., EUR)' } }, required: ['amount', 'from', 'to'] } },
           { type: 'function', name: 'get_stock_price', description: 'Gets current stock price and change.', parameters: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
           { type: 'function', name: 'get_crypto_price', description: 'Gets current cryptocurrency price.', parameters: { type: 'object', properties: { symbol: { type: 'string' }, currency: { type: 'string' } }, required: ['symbol'] } },
-          { type: 'function', name: 'get_definition', description: 'Gets the dictionary definition of a word.', parameters: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] } },
-          { type: 'function', name: 'wikipedia_search', description: 'Searches Wikipedia for information on a topic.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
-          { type: 'function', name: 'convert_units', description: 'Converts between units of measurement.', parameters: { type: 'object', properties: { value: { type: 'number' }, from: { type: 'string' }, to: { type: 'string' } }, required: ['value', 'from', 'to'] } },
+
+          // Language & Translation
+          { type: 'function', name: 'translate_text', description: 'Translates text between languages.', parameters: { type: 'object', properties: { text: { type: 'string' }, targetLang: { type: 'string', description: 'Target language code (e.g., es, fr, de)' }, sourceLang: { type: 'string', description: 'Source language code (optional, auto-detect if not provided)' } }, required: ['text', 'targetLang'] } },
+
+          // Time & Productivity
           { type: 'function', name: 'get_time', description: 'Gets current time in a specific timezone.', parameters: { type: 'object', properties: { timezone: { type: 'string' } }, required: ['timezone'] } },
-          { type: 'function', name: 'set_reminder', description: 'Creates a reminder as a calendar event.', parameters: { type: 'object', properties: { title: { type: 'string' }, dateTime: { type: 'string' }, priority: { type: 'string' } }, required: ['title', 'dateTime'] } },
+          { type: 'function', name: 'set_timer', description: 'Sets a countdown timer.', parameters: { type: 'object', properties: { duration: { type: 'number', description: 'Duration in seconds' }, label: { type: 'string', description: 'Optional label for the timer' } }, required: ['duration'] } },
+          { type: 'function', name: 'create_note', description: 'Creates a quick note or memo.', parameters: { type: 'object', properties: { title: { type: 'string' }, content: { type: 'string' } }, required: ['content'] } },
         ],
       },
     });
