@@ -1086,57 +1086,80 @@ IMPORTANT LISTENING BEHAVIOR:
       {showSettings && (
         <div className="settings-panel">
           <div className="settings-content">
-            <h3>Settings</h3>
-
-            <div className="setting-item">
-              <span>Wake Word Detection</span>
-              <button
-                className={`toggle-btn ${wakeWordEnabled ? 'active' : ''}`}
-                onClick={() => {
-                  const next = !wakeWordEnabled;
-                  setWakeWordEnabled(next);
-                  if (next && !listening) startWakeRecognition();
-                  else stopWakeRecognition();
-                }}
-              >
-                {wakeWordEnabled ? 'On' : 'Off'}
-              </button>
+            <div className="settings-header">
+              <h2>Settings</h2>
+              <p className="settings-subtitle">Customize your Mayler experience</p>
             </div>
 
-            <div className="setting-item">
-              <span>Voice Style</span>
-              <select
-                className="voice-select"
-                value={selectedVoice}
-                onChange={(e) => {
-                  const newVoice = e.target.value as typeof selectedVoice;
-                  setSelectedVoice(newVoice);
-                  // Reconfigure session with new voice if connected
-                  if (connected) {
-                    configureSession();
-                  }
-                }}
-              >
-                <option value="alloy">Alloy - Balanced and neutral</option>
-                <option value="echo">Echo - Warm and friendly</option>
-                <option value="fable">Fable - Expressive and dynamic</option>
-                <option value="onyx">Onyx - Deep and authoritative</option>
-                <option value="nova">Nova - Bright and energetic</option>
-                <option value="shimmer">Shimmer - Soft and gentle</option>
-              </select>
-            </div>
+            <div className="settings-sections">
+              {/* Voice & Speech Section */}
+              <div className="setting-section">
+                <h3>Voice & Speech</h3>
 
-            <div className="setting-item">
-              <span>Google Account</span>
-              <button
-                className={`toggle-btn ${googleStatus === 'available' ? 'active' : ''}`}
-                onClick={() => {
-                  console.log('[Button] Google Account Connect button clicked');
-                  triggerGoogleAuth();
-                }}
-              >
-                {googleStatus === 'available' ? 'Connected' : 'Connect'}
-              </button>
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <label>Voice Style</label>
+                    <span className="setting-description">Choose how Mayler sounds</span>
+                  </div>
+                  <select
+                    className="voice-select"
+                    value={selectedVoice}
+                    onChange={(e) => {
+                      const newVoice = e.target.value as typeof selectedVoice;
+                      setSelectedVoice(newVoice);
+                      if (connected) {
+                        configureSession();
+                      }
+                    }}
+                  >
+                    <option value="alloy">Alloy - Balanced</option>
+                    <option value="echo">Echo - Warm</option>
+                    <option value="fable">Fable - Expressive</option>
+                    <option value="onyx">Onyx - Deep</option>
+                    <option value="nova">Nova - Bright</option>
+                    <option value="shimmer">Shimmer - Soft</option>
+                  </select>
+                </div>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <label>Wake Word</label>
+                    <span className="setting-description">Always listen for "Hey Mayler"</span>
+                  </div>
+                  <button
+                    className={`toggle-btn ${wakeWordEnabled ? 'active' : ''}`}
+                    onClick={() => {
+                      const next = !wakeWordEnabled;
+                      setWakeWordEnabled(next);
+                      if (next && !listening) startWakeRecognition();
+                      else stopWakeRecognition();
+                    }}
+                  >
+                    {wakeWordEnabled ? 'On' : 'Off'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Integrations Section */}
+              <div className="setting-section">
+                <h3>Integrations</h3>
+
+                <div className="setting-item">
+                  <div className="setting-info">
+                    <label>Google Account</label>
+                    <span className="setting-description">Gmail and Calendar access</span>
+                  </div>
+                  <button
+                    className={`toggle-btn ${googleStatus === 'available' ? 'active' : ''}`}
+                    onClick={() => {
+                      console.log('[Button] Google Account Connect button clicked');
+                      triggerGoogleAuth();
+                    }}
+                  >
+                    {googleStatus === 'available' ? 'Connected' : 'Connect'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <button className="close-settings" onClick={() => setShowSettings(false)}>
