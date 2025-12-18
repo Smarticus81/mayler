@@ -183,10 +183,12 @@ body {
 
 .settings-content {
   background: var(--bg-tertiary);
-  border-radius: 32px;
-  padding: 48px;
-  min-width: 420px;
+  border-radius: 40px;
+  padding: 40px;
+  width: 92%;
   max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   box-shadow:
@@ -194,6 +196,11 @@ body {
     0 0 0 1px rgba(168, 181, 160, 0.05);
   animation: slideUp 0.4s var(--ease-bounce);
   border: none;
+  scrollbar-width: none;
+}
+
+.settings-content::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes slideUp {
@@ -749,46 +756,59 @@ body {
 
 @media (max-width: 768px) {
   .brand-logo {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
   }
 
   .brand-name {
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .brand-tagline {
-    font-size: 12px;
+    font-size: 11px;
   }
 
   .orb-container {
-    width: 240px;
-    height: 240px;
+    width: 220px;
+    height: 220px;
+  }
+
+  .zen-orb {
+    width: 160px;
+    height: 160px;
+  }
+
+  .settings-content {
+    padding: 32px 24px;
+    border-radius: 32px;
+  }
+
+  .settings-header h2 {
+    font-size: 24px;
+  }
+
+  .voice-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .transcript-area {
+    width: 95%;
+    padding: 16px;
+    border-radius: 24px;
   }
 
   .transcript-text {
     font-size: 14px;
   }
 
-  .main-btn {
-    width: 64px;
-    height: 64px;
+  .controls {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
   }
 
-  .main-btn svg {
-    width: 24px;
-    height: 24px;
-  }
-
-  .shutdown-btn {
-    width: 56px;
-    height: 56px;
-    margin-left: 12px;
-  }
-
-  .shutdown-btn svg {
-    width: 20px;
-    height: 20px;
+  .primary-btn {
+    padding: 16px 32px;
+    border-radius: 24px;
+    width: 80%;
   }
 }
 
