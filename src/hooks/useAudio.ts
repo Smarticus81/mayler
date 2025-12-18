@@ -3,23 +3,36 @@ import { useRef, useCallback, useEffect } from 'react';
 export const useAudio = () => {
     const audioContextRef = useRef<AudioContext | null>(null);
 
-    useEffect(() => {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        try {
-            audioContextRef.current = new Ctx();
-        } catch (error) {
-            console.error('Failed to create AudioContext:', error);
+    const initAudioContext = useCallback(() => {
+        if (!audioContextRef.current) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            try {
+                audioContextRef.current = new Ctx();
+            } catch (error) {
+                console.error('Failed to create AudioContext:', error);
+            }
         }
+
+        if (audioContextRef.current?.state === 'suspended') {
+            audioContextRef.current.resume().catch(err => {
+                console.error('Failed to resume AudioContext:', err);
+            });
+        }
+
+        return audioContextRef.current;
+    }, []);
+
+    useEffect(() => {
         return () => {
             audioContextRef.current?.close().catch(() => { });
         };
     }, []);
 
     const playWakeChime = useCallback(() => {
-        if (!audioContextRef.current) return;
+        const ctx = initAudioContext();
+        if (!ctx) return;
 
         try {
-            const ctx = audioContextRef.current;
             const now = ctx.currentTime;
 
             // Create a pleasant two-tone chime (C5 -> E5)
@@ -48,10 +61,10 @@ export const useAudio = () => {
         } catch (error) {
             console.error('Failed to play wake chime:', error);
         }
-    }, []);
+    }, [initAudioContext]);
 
     return {
-        audioContext: audioContextRef.current,
+        initAudioContext,
         playWakeChime,
     };
 };

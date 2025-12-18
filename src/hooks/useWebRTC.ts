@@ -230,8 +230,9 @@ export const useWebRTC = () => {
             await pc.setLocalDescription(offer);
 
             const baseUrl = 'https://api.openai.com/v1/realtime';
-            const model = 'gpt-4o-realtime-preview-2024-12-17';
-            const sdpResp = await fetch(`${baseUrl}?model=${model}`, {
+            const url = baseUrl;
+
+            const sdpResp = await fetch(url, {
                 method: 'POST',
                 body: offer.sdp,
                 headers: {
@@ -240,9 +241,16 @@ export const useWebRTC = () => {
                 },
             });
 
+            if (!sdpResp.ok) {
+                const errText = await sdpResp.text();
+                console.error('OpenAI WebRTC Error:', errText);
+                throw new Error(`OpenAI SDP Error: ${sdpResp.status}`);
+            }
+
+            const answerSdp = await sdpResp.text();
             await pc.setRemoteDescription({
                 type: 'answer',
-                sdp: await sdpResp.text(),
+                sdp: answerSdp,
             });
 
         } catch (e: any) {

@@ -10,17 +10,25 @@ import { BrandHeader } from '../components/BrandHeader';
 
 export const MainLayout: React.FC = () => {
     const { connected, setShowSettings, error } = useMayler();
-    const { playWakeChime } = useAudio();
     const { connect, disconnect, remoteAudioElRef } = useWebRTC();
+    const { initAudioContext, playWakeChime } = useAudio();
+    const [isActive, setIsActive] = useState(false);
     const [audioLevel] = useState(0);
 
-    // Initialize wake word detection
+    const handleStart = () => {
+        initAudioContext();
+        setIsActive(true);
+    };
+
+    // Initialize wake word detection and start detection only when active
     useWakeWord(
         () => {
+            if (!isActive) return;
             console.log('Wake word detected! Connecting...');
-            connect(true); // Connect and greet
+            connect(true);
         },
-        playWakeChime
+        playWakeChime,
+        isActive
     );
 
     return (
@@ -48,7 +56,15 @@ export const MainLayout: React.FC = () => {
 
                 <TranscriptStream />
 
-                {!connected && (
+                {!isActive && (
+                    <div className="status-hint">
+                        <button className="primary-btn pulse" onClick={handleStart}>
+                            Activate Mayler
+                        </button>
+                    </div>
+                )}
+
+                {isActive && !connected && (
                     <div className="status-hint">
                         Say "Hey Mayler" to start
                     </div>

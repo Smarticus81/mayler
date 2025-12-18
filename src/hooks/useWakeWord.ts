@@ -8,7 +8,7 @@ const WAKE_WORDS = [
     'mailer', 'maler', 'miller', 'my ler', 'my lor'
 ];
 
-export const useWakeWord = (onWake: () => void, onChime: () => void) => {
+export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: boolean = true) => {
     const { wakeWordEnabled, isWakeMode } = useMayler();
     const recognizerRef = useRef<any>(null);
     const wakeRunningRef = useRef(false);
@@ -70,13 +70,13 @@ export const useWakeWord = (onWake: () => void, onChime: () => void) => {
     }, [detectWakeWord, onWake, onChime, stopWakeRecognition, wakeWordEnabled, isWakeMode]);
 
     useEffect(() => {
-        if (wakeWordEnabled && isWakeMode) {
+        if (wakeWordEnabled && isWakeMode && isActive) {
             startWakeRecognition();
         } else {
             stopWakeRecognition();
         }
         return () => stopWakeRecognition();
-    }, [wakeWordEnabled, isWakeMode, startWakeRecognition, stopWakeRecognition]);
+    }, [wakeWordEnabled, isWakeMode, isActive, startWakeRecognition, stopWakeRecognition]);
 
     return {
         startWakeRecognition,
