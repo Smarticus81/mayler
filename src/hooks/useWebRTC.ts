@@ -17,7 +17,7 @@ export const useWebRTC = () => {
         setAgentInterimTranscript,
         selectedVoice,
         voiceEngine,
-        elevenLabsVoiceId,
+
         rimeSpeakerId,
     } = useMayler();
 
@@ -174,22 +174,6 @@ export const useWebRTC = () => {
                     if (text.trim()) {
                         setAgentTranscript(text);
                         setAgentInterimTranscript('');
-
-                        // ElevenLabs Playback
-                        if (voiceEngine === 'elevenlabs') {
-                            fetch('/api/tts', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ text, voiceId: elevenLabsVoiceId })
-                            })
-                                .then(res => res.blob())
-                                .then(blob => {
-                                    const url = URL.createObjectURL(blob);
-                                    const audio = new Audio(url);
-                                    audio.play();
-                                })
-                                .catch(err => console.error('ElevenLabs playback failed:', err));
-                        }
 
                         // Rime Playback
                         if (voiceEngine === 'rime') {

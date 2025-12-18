@@ -9,7 +9,7 @@ export const SettingsModal: React.FC = () => {
         googleStatus,
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
-        elevenLabsVoiceId, setElevenLabsVoiceId,
+
         rimeSpeakerId, setRimeSpeakerId
     } = useMayler();
 
@@ -37,12 +37,7 @@ export const SettingsModal: React.FC = () => {
                             >
                                 OpenAI (Fast)
                             </button>
-                            <button
-                                className={`voice-btn ${voiceEngine === 'elevenlabs' ? 'active' : ''}`}
-                                onClick={() => setVoiceEngine('elevenlabs')}
-                            >
-                                ElevenLabs (HD)
-                            </button>
+
                             <button
                                 className={`voice-btn ${voiceEngine === 'rime' ? 'active' : ''}`}
                                 onClick={() => setVoiceEngine('rime')}
@@ -55,7 +50,8 @@ export const SettingsModal: React.FC = () => {
                     <div className="setting-section">
                         <h3>
                             {voiceEngine === 'openai' ? 'OpenAI Voice' :
-                                voiceEngine === 'elevenlabs' ? 'ElevenLabs Voice' : 'Rime Speaker'}
+                                voiceEngine === 'rime' ? 'Rime Speaker' : 'Unknown'}
+
                         </h3>
                         {voiceEngine === 'openai' ? (
                             <div className="voice-grid">
@@ -68,26 +64,6 @@ export const SettingsModal: React.FC = () => {
                                         {voice.charAt(0).toUpperCase() + voice.slice(1)}
                                     </button>
                                 ))}
-                            </div>
-                        ) : voiceEngine === 'elevenlabs' ? (
-                            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-                                <label style={{ fontSize: '12px', opacity: 0.7 }}>ElevenLabs Voice ID</label>
-                                <input
-                                    type="text"
-                                    value={elevenLabsVoiceId}
-                                    onChange={(e) => setElevenLabsVoiceId(e.target.value)}
-                                    placeholder="Enter Voice ID"
-                                    className="settings-input"
-                                    style={{
-                                        background: 'var(--glass-bg)',
-                                        border: '1px solid var(--glass-border)',
-                                        borderRadius: '8px',
-                                        padding: '8px 12px',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '14px'
-                                    }}
-                                />
-                                <span style={{ fontSize: '11px', opacity: 0.5 }}>Try ID: JBFqnCBsd6RMkjVDRZzb (George) or N2lVS1wzexvYrd31Y2qn (Domi)</span>
                             </div>
                         ) : (
                             <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>

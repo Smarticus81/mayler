@@ -10,7 +10,7 @@ export type GoogleStatus = 'unknown' | 'available' | 'unavailable';
 
 export type VoiceOption = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 
-export type VoiceEngine = 'openai' | 'elevenlabs' | 'rime';
+export type VoiceEngine = 'openai' | 'rime';
 
 export interface WebRTCSessionConfig {
     voice: VoiceOption;

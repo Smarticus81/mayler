@@ -38,8 +38,7 @@ interface MaylerContextType {
     setSelectedVoice: Dispatch<SetStateAction<VoiceOption>>;
     voiceEngine: VoiceEngine;
     setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
-    elevenLabsVoiceId: string;
-    setElevenLabsVoiceId: Dispatch<SetStateAction<string>>;
+
     rimeSpeakerId: string;
     setRimeSpeakerId: Dispatch<SetStateAction<string>>;
     showSettings: boolean;
@@ -66,7 +65,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [googleStatus, setGoogleStatus] = useState<GoogleStatus>('unknown');
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('alloy');
     const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>('openai');
-    const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>('JBFqnCBsd6RMkjVDRZzb'); // George
+
     const [rimeSpeakerId, setRimeSpeakerId] = useState<string>('marsh');
     const [showSettings, setShowSettings] = useState(false);
 
@@ -85,7 +84,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         googleStatus, setGoogleStatus,
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
-        elevenLabsVoiceId, setElevenLabsVoiceId,
+
         rimeSpeakerId, setRimeSpeakerId,
         showSettings, setShowSettings,
     };
