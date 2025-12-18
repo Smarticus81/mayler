@@ -232,7 +232,7 @@ export const useWebRTC = () => {
             const baseUrl = 'https://api.openai.com/v1/realtime';
             // Re-adding the model parameter with the generic alias to match server.js.
             // Documentation implies the model is required in the URL context for WebRTC initialization.
-            const url = `${baseUrl}?model=gpt-4o-realtime-preview`;
+            const url = `${baseUrl}?model=gpt-realtime`;
 
             const sdpResp = await fetch(url, {
                 method: 'POST',

@@ -48,7 +48,7 @@ async function createOpenAIRealtimeEphemeralToken() {
     throw err;
   }
 
-  const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-4o-realtime-preview';
+  const model = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime';
   const voice = process.env.OPENAI_VOICE || 'verse';
 
   // Mint an ephemeral client secret on the server using a standard API key.
