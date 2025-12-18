@@ -95,9 +95,10 @@ export const useWebRTC = () => {
             const tokenResp = await fetch('/api/token', { method: 'POST' });
             const tokenJson = await tokenResp.json();
             const tokenData = asObject(tokenJson);
+            console.log('[WebRTC] Token Response:', tokenData);
 
             let token: string | null = null;
-            let modelName = 'gpt-4o-realtime-preview-2024-12-17'; // fallback
+            let modelName = 'gpt-4o-realtime-preview'; // fallback
 
             if (tokenData) {
                 const clientSecret = asObject(tokenData.client_secret);
