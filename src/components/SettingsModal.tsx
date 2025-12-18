@@ -21,7 +21,7 @@ export const SettingsModal: React.FC = () => {
         ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
     return (
-        <div className="settings-panel">
+        <div className="settings-panel" onClick={() => setShowSettings(false)}>
             <div className="settings-content" onClick={(e) => e.stopPropagation()}>
                 <div className="settings-header">
                     <h2>Settings</h2>
