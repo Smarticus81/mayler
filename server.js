@@ -84,8 +84,8 @@ async function createOpenAIRealtimeEphemeralToken() {
     throw err;
   }
 
-  // Return the raw data as per the user's example
-  return data;
+  // Return the raw data with the configured model mixed in for the client
+  return { ...data, model };
 }
 
 // OpenAI Realtime ephemeral token endpoint (used by the browser for WebRTC auth)

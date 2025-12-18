@@ -97,9 +97,14 @@ export const useWebRTC = () => {
             const tokenData = asObject(tokenJson);
 
             let token: string | null = null;
+            let modelName = 'gpt-4o-realtime-preview-2024-12-17'; // fallback
+
             if (tokenData) {
                 const clientSecret = asObject(tokenData.client_secret);
                 token = clientSecret ? asString(clientSecret.value) : asString(tokenData.value);
+                if (tokenData.model) {
+                    modelName = asString(tokenData.model) || modelName;
+                }
             }
 
             if (!tokenResp.ok || !token) {
@@ -230,9 +235,8 @@ export const useWebRTC = () => {
             await pc.setLocalDescription(offer);
 
             const baseUrl = 'https://api.openai.com/v1/realtime';
-            // Re-adding the model parameter with the specific dated alias to match server.js.
-            // Documentation implies the model is required in the URL context for WebRTC initialization.
-            const url = `${baseUrl}?model=gpt-4o-realtime-preview-2024-12-17`;
+            // Use the model returned by the server to ensure consistency with the token.
+            const url = `${baseUrl}?model=${modelName}`;
 
             const sdpResp = await fetch(url, {
                 method: 'POST',
