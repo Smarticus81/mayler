@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
-import type { GoogleStatus, VoiceOption } from '../types';
+import type { GoogleStatus, VoiceOption, VoiceEngine } from '../types';
 
 interface MaylerContextType {
     // Connection State
@@ -36,6 +36,12 @@ interface MaylerContextType {
     setGoogleStatus: Dispatch<SetStateAction<GoogleStatus>>;
     selectedVoice: VoiceOption;
     setSelectedVoice: Dispatch<SetStateAction<VoiceOption>>;
+    voiceEngine: VoiceEngine;
+    setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
+    elevenLabsVoiceId: string;
+    setElevenLabsVoiceId: Dispatch<SetStateAction<string>>;
+    rimeSpeakerId: string;
+    setRimeSpeakerId: Dispatch<SetStateAction<string>>;
     showSettings: boolean;
     setShowSettings: Dispatch<SetStateAction<boolean>>;
 }
@@ -59,6 +65,9 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
     const [googleStatus, setGoogleStatus] = useState<GoogleStatus>('unknown');
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('alloy');
+    const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>('openai');
+    const [elevenLabsVoiceId, setElevenLabsVoiceId] = useState<string>('JBFqnCBsd6RMkjVDRZzb'); // George
+    const [rimeSpeakerId, setRimeSpeakerId] = useState<string>('marsh');
     const [showSettings, setShowSettings] = useState(false);
 
     const value = {
@@ -75,6 +84,9 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         wakeWordEnabled, setWakeWordEnabled,
         googleStatus, setGoogleStatus,
         selectedVoice, setSelectedVoice,
+        voiceEngine, setVoiceEngine,
+        elevenLabsVoiceId, setElevenLabsVoiceId,
+        rimeSpeakerId, setRimeSpeakerId,
         showSettings, setShowSettings,
     };
 

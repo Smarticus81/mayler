@@ -16,6 +16,9 @@ export const useWebRTC = () => {
         setAgentTranscript,
         setAgentInterimTranscript,
         selectedVoice,
+        voiceEngine,
+        elevenLabsVoiceId,
+        rimeSpeakerId,
     } = useMayler();
 
     const { runTool, toolkitDefinitions } = useToolkit();
@@ -33,12 +36,14 @@ export const useWebRTC = () => {
     }, []);
 
     const configureSession = useCallback(() => {
+        const modalities = voiceEngine === 'openai' ? ['audio'] : ['text'];
+
         sendEvent({
             type: 'session.update',
             session: {
                 type: 'realtime',
                 instructions: `You are mayler, a laid-back but professional AI assistant.`,
-                output_modalities: ['audio'],
+                output_modalities: modalities,
                 audio: {
                     input: {
                         transcription: { model: 'gpt-4o-mini-transcribe' },
@@ -56,7 +61,7 @@ export const useWebRTC = () => {
                 tools: toolkitDefinitions,
             },
         });
-    }, [sendEvent, selectedVoice, toolkitDefinitions]);
+    }, [sendEvent, selectedVoice, toolkitDefinitions, voiceEngine]);
 
     const handleFunctionCall = useCallback(async (call_id: string, name: string, rawArgs: unknown) => {
         let args: unknown = rawArgs;
@@ -158,9 +163,44 @@ export const useWebRTC = () => {
                 if (t === 'response.audio_transcript.delta') {
                     setAgentInterimTranscript(prev => prev + (asString(msg.delta) || ''));
                 }
-                if (t === 'response.audio_transcript.done') {
-                    setAgentTranscript(asString(msg.transcript) || '');
-                    setAgentInterimTranscript('');
+                if (t === 'response.audio_transcript.done' || t === 'response.text.done') {
+                    const text = asString(msg.transcript) || asString(msg.text) || '';
+                    if (text.trim()) {
+                        setAgentTranscript(text);
+                        setAgentInterimTranscript('');
+
+                        // ElevenLabs Playback
+                        if (voiceEngine === 'elevenlabs') {
+                            fetch('/api/tts', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text, voiceId: elevenLabsVoiceId })
+                            })
+                                .then(res => res.blob())
+                                .then(blob => {
+                                    const url = URL.createObjectURL(blob);
+                                    const audio = new Audio(url);
+                                    audio.play();
+                                })
+                                .catch(err => console.error('ElevenLabs playback failed:', err));
+                        }
+
+                        // Rime Playback
+                        if (voiceEngine === 'rime') {
+                            fetch('/api/tts/rime', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ text, speakerId: rimeSpeakerId })
+                            })
+                                .then(res => res.blob())
+                                .then(blob => {
+                                    const url = URL.createObjectURL(blob);
+                                    const audio = new Audio(url);
+                                    audio.play();
+                                })
+                                .catch(err => console.error('Rime playback failed:', err));
+                        }
+                    }
                 }
 
                 if (t === 'input_audio_transcription.delta') {
