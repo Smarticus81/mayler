@@ -381,6 +381,38 @@ body {
 
 .brand {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  opacity: 0.9;
+  filter: drop-shadow(0 4px 12px rgba(168, 181, 160, 0.15));
+  transition: all 0.4s var(--ease-smooth);
+  animation: float 6s ease-in-out infinite;
+}
+
+.brand-logo:hover {
+  opacity: 1;
+  transform: scale(1.05);
+  filter: drop-shadow(0 6px 20px rgba(168, 181, 160, 0.25));
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
 }
 
 .brand-name {
@@ -390,6 +422,17 @@ body {
   color: var(--text-primary);
   opacity: 0.9;
   text-transform: lowercase;
+  margin: 0;
+}
+
+.brand-tagline {
+  font-size: 13px;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  opacity: 0.7;
+  margin: 0;
+  font-style: italic;
 }
 
 .orb-container {
@@ -705,8 +748,17 @@ body {
 }
 
 @media (max-width: 768px) {
+  .brand-logo {
+    width: 56px;
+    height: 56px;
+  }
+
   .brand-name {
     font-size: 24px;
+  }
+
+  .brand-tagline {
+    font-size: 12px;
   }
 
   .orb-container {

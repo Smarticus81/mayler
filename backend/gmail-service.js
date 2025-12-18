@@ -6,11 +6,14 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Gmail API and Calendar scopes
+// Gmail API and Calendar scopes - EXPANDED
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/gmail.modify',
+  'https://www.googleapis.com/auth/gmail.compose', // For drafts
+  'https://www.googleapis.com/auth/gmail.labels', // For labels
+  'https://www.googleapis.com/auth/gmail.metadata', // For metadata
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events'
 ];
@@ -30,7 +33,6 @@ class GmailService {
       // Prefer credentials from environment for cloud deployments
       let credentials = null;
       const credsFromEnv = process.env.GMAIL_CREDENTIALS_JSON;
-      console.log('[Gmail Debug] GMAIL_CREDENTIALS_JSON env var exists:', !!credsFromEnv);
       if (credsFromEnv) {
         try {
           credentials = JSON.parse(credsFromEnv);
@@ -47,7 +49,7 @@ class GmailService {
         }
         credentials = JSON.parse(await fs.readFile(CREDENTIALS_PATH, 'utf8'));
       }
-      const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+      const { client_secret, client_id } = credentials.installed || credentials.web;
 
       // Use our auth redirect endpoint - prefer env var for flexibility
       const redirectUri = process.env.OAUTH_REDIRECT_URI ||
@@ -59,7 +61,6 @@ class GmailService {
 
       // Check if we have a stored token (prefer env var for cloud)
       const tokenFromEnv = process.env.GMAIL_TOKEN_JSON;
-      console.log('[Gmail Debug] GMAIL_TOKEN_JSON env var exists:', !!tokenFromEnv);
       if (tokenFromEnv) {
         try {
           this.auth.setCredentials(JSON.parse(tokenFromEnv));
@@ -73,15 +74,12 @@ class GmailService {
           this.auth.setCredentials(JSON.parse(token));
         } catch (err) {
           console.log('No stored Gmail token found. Gmail features will require authentication.');
-          // Don't return false here - we still want to allow getting the auth URL
         }
       }
 
       this.gmail = google.gmail({ version: 'v1', auth: this.auth });
       this.calendar = google.calendar({ version: 'v3', auth: this.auth });
 
-      // Return true if we have credentials (even without token)
-      // This allows the auth flow to work
       return true;
     } catch (error) {
       console.error('Failed to initialize Gmail service:', error);
@@ -109,7 +107,7 @@ class GmailService {
     const { tokens } = await this.auth.getToken(code);
     this.auth.setCredentials(tokens);
 
-    // Store the token for future use (filesystem; for cloud consider secrets store)
+    // Store the token for future use
     try {
       await fs.writeFile(TOKEN_PATH, JSON.stringify(tokens));
     } catch (e) {
@@ -121,15 +119,14 @@ class GmailService {
     return true;
   }
 
-  // Alias for OAuth callback handling
   async handleAuthCallback(code) {
     return this.setAuthCode(code);
   }
 
+  // ==================== EMAIL READ OPERATIONS ====================
+
   async getRecentEmails(maxResults = 10) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
       const response = await this.gmail.users.messages.list({
@@ -138,44 +135,12 @@ class GmailService {
         q: 'in:inbox'
       });
 
-      if (!response.data.messages) {
-        return [];
-      }
+      if (!response.data.messages) return [];
 
       const emails = [];
-      for (const message of response.data.messages.slice(0, 5)) { // Limit to 5 for performance
-        const email = await this.gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'full'
-        });
-
-        const headers = email.data.payload.headers;
-        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-        const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
-        const date = headers.find(h => h.name === 'Date')?.value || '';
-
-        // Get email body
-        let body = '';
-        if (email.data.payload.body?.data) {
-          body = Buffer.from(email.data.payload.body.data, 'base64').toString();
-        } else if (email.data.payload.parts) {
-          for (const part of email.data.payload.parts) {
-            if (part.mimeType === 'text/plain' && part.body?.data) {
-              body = Buffer.from(part.body.data, 'base64').toString();
-              break;
-            }
-          }
-        }
-
-        emails.push({
-          id: message.id,
-          subject,
-          from,
-          date,
-          snippet: email.data.snippet,
-          body: body.slice(0, 500) // Limit body length
-        });
+      for (const message of response.data.messages.slice(0, Math.min(maxResults, 10))) {
+        const email = await this.getEmailById(message.id);
+        emails.push(email);
       }
 
       return emails;
@@ -186,9 +151,7 @@ class GmailService {
   }
 
   async searchEmails(query, maxResults = 5) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
       const response = await this.gmail.users.messages.list({
@@ -197,31 +160,12 @@ class GmailService {
         q: query
       });
 
-      if (!response.data.messages) {
-        return [];
-      }
+      if (!response.data.messages) return [];
 
       const emails = [];
       for (const message of response.data.messages) {
-        const email = await this.gmail.users.messages.get({
-          userId: 'me',
-          id: message.id,
-          format: 'metadata',
-          metadataHeaders: ['Subject', 'From', 'Date']
-        });
-
-        const headers = email.data.payload.headers;
-        const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
-        const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
-        const date = headers.find(h => h.name === 'Date')?.value || '';
-
-        emails.push({
-          id: message.id,
-          subject,
-          from,
-          date,
-          snippet: email.data.snippet
-        });
+        const email = await this.getEmailById(message.id);
+        emails.push(email);
       }
 
       return emails;
@@ -232,9 +176,7 @@ class GmailService {
   }
 
   async getEmailById(emailId) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
       const email = await this.gmail.users.messages.get({
@@ -248,23 +190,31 @@ class GmailService {
       const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
       const to = headers.find(h => h.name === 'To')?.value || 'Unknown';
       const date = headers.find(h => h.name === 'Date')?.value || '';
+      const messageId = headers.find(h => h.name === 'Message-ID')?.value || '';
 
-      // Get email body
+      // Extract body
       let body = '';
       let htmlBody = '';
+      const parts = this._extractParts(email.data.payload);
 
-      if (email.data.payload.body?.data) {
-        body = Buffer.from(email.data.payload.body.data, 'base64').toString();
-      } else if (email.data.payload.parts) {
-        for (const part of email.data.payload.parts) {
-          if (part.mimeType === 'text/plain' && part.body?.data) {
-            body = Buffer.from(part.body.data, 'base64').toString();
-          }
-          if (part.mimeType === 'text/html' && part.body?.data) {
-            htmlBody = Buffer.from(part.body.data, 'base64').toString();
-          }
+      for (const part of parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          body = Buffer.from(part.body.data, 'base64').toString();
+        }
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          htmlBody = Buffer.from(part.body.data, 'base64').toString();
         }
       }
+
+      // Extract attachments
+      const attachments = parts
+        .filter(part => part.filename && part.body?.attachmentId)
+        .map(part => ({
+          filename: part.filename,
+          mimeType: part.mimeType,
+          size: part.body.size,
+          attachmentId: part.body.attachmentId
+        }));
 
       return {
         id: emailId,
@@ -272,11 +222,16 @@ class GmailService {
         from,
         to,
         date,
+        messageId,
         snippet: email.data.snippet,
-        body,
+        body: body.slice(0, 1000), // Limit for voice
         htmlBody,
         threadId: email.data.threadId,
-        labelIds: email.data.labelIds
+        labelIds: email.data.labelIds || [],
+        attachments,
+        isRead: !email.data.labelIds?.includes('UNREAD'),
+        isStarred: email.data.labelIds?.includes('STARRED'),
+        isImportant: email.data.labelIds?.includes('IMPORTANT')
       };
     } catch (error) {
       console.error('Failed to get email:', error);
@@ -284,13 +239,40 @@ class GmailService {
     }
   }
 
-  async sendEmail({ to, subject, text, cc, bcc, html, replyTo, threadId, inReplyTo, references }) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
+  async getEmailThread(threadId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
-      // Build email headers
+      const thread = await this.gmail.users.threads.get({
+        userId: 'me',
+        id: threadId,
+        format: 'full'
+      });
+
+      const messages = [];
+      for (const message of thread.data.messages || []) {
+        const email = await this.getEmailById(message.id);
+        messages.push(email);
+      }
+
+      return {
+        id: threadId,
+        snippet: thread.data.snippet,
+        messages,
+        messageCount: messages.length
+      };
+    } catch (error) {
+      console.error('Failed to get thread:', error);
+      throw new Error('Failed to retrieve thread');
+    }
+  }
+
+  // ==================== EMAIL WRITE OPERATIONS ====================
+
+  async sendEmail({ to, subject, text, cc, bcc, html, replyTo, threadId, inReplyTo, references }) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
       const headers = [
         `To: ${to}`,
         `Subject: ${subject}`
@@ -302,12 +284,10 @@ class GmailService {
       if (inReplyTo) headers.push(`In-Reply-To: ${inReplyTo}`);
       if (references) headers.push(`References: ${references}`);
 
-      // Build email body
       const boundary = '----=_Part_' + Date.now();
       let body = headers.join('\r\n');
 
       if (html) {
-        // Multipart email with text and HTML
         body += `\r\nMIME-Version: 1.0\r\n`;
         body += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
         body += `--${boundary}\r\n`;
@@ -318,11 +298,9 @@ class GmailService {
         body += html;
         body += `\r\n\r\n--${boundary}--`;
       } else {
-        // Plain text email
         body += '\r\n\r\n' + text;
       }
 
-      // Encode email as base64url
       const encodedEmail = Buffer.from(body)
         .toString('base64')
         .replace(/\+/g, '-')
@@ -336,7 +314,6 @@ class GmailService {
         }
       };
 
-      // If replying to a thread, include threadId
       if (threadId) {
         params.requestBody.threadId = threadId;
       }
@@ -354,140 +331,21 @@ class GmailService {
     }
   }
 
-  async deleteEmail(emailId, permanent = false) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
-
-    try {
-      if (permanent) {
-        // Permanently delete
-        await this.gmail.users.messages.delete({
-          userId: 'me',
-          id: emailId
-        });
-      } else {
-        // Move to trash
-        await this.gmail.users.messages.trash({
-          userId: 'me',
-          id: emailId
-        });
-      }
-
-      return { success: true, id: emailId, permanent };
-    } catch (error) {
-      console.error('Failed to delete email:', error);
-      throw new Error('Failed to delete email');
-    }
-  }
-
-  async markEmailRead(emailId) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
-
-    try {
-      await this.gmail.users.messages.modify({
-        userId: 'me',
-        id: emailId,
-        requestBody: {
-          removeLabelIds: ['UNREAD']
-        }
-      });
-
-      return { success: true, id: emailId, action: 'marked_read' };
-    } catch (error) {
-      console.error('Failed to mark email as read:', error);
-      throw new Error('Failed to mark email as read');
-    }
-  }
-
-  async markEmailUnread(emailId) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
-
-    try {
-      await this.gmail.users.messages.modify({
-        userId: 'me',
-        id: emailId,
-        requestBody: {
-          addLabelIds: ['UNREAD']
-        }
-      });
-
-      return { success: true, id: emailId, action: 'marked_unread' };
-    } catch (error) {
-      console.error('Failed to mark email as unread:', error);
-      throw new Error('Failed to mark email as unread');
-    }
-  }
-
-  async starEmail(emailId) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
-
-    try {
-      await this.gmail.users.messages.modify({
-        userId: 'me',
-        id: emailId,
-        requestBody: {
-          addLabelIds: ['STARRED']
-        }
-      });
-
-      return { success: true, id: emailId, action: 'starred' };
-    } catch (error) {
-      console.error('Failed to star email:', error);
-      throw new Error('Failed to star email');
-    }
-  }
-
-  async archiveEmail(emailId) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
-
-    try {
-      await this.gmail.users.messages.modify({
-        userId: 'me',
-        id: emailId,
-        requestBody: {
-          removeLabelIds: ['INBOX']
-        }
-      });
-
-      return { success: true, id: emailId, action: 'archived' };
-    } catch (error) {
-      console.error('Failed to archive email:', error);
-      throw new Error('Failed to archive email');
-    }
-  }
-
   async replyToEmail(emailId, text, html) {
-    if (!this.gmail) {
-      throw new Error('Gmail not authenticated');
-    }
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
-      // Get the original email to extract headers
       const originalEmail = await this.getEmailById(emailId);
-
-      // Extract the original sender's email from "From" header
       const toMatch = originalEmail.from.match(/<(.+?)>/) || [null, originalEmail.from];
       const to = toMatch[1];
 
-      // Build subject with "Re: " prefix if not already present
       let subject = originalEmail.subject;
       if (!subject.toLowerCase().startsWith('re:')) {
         subject = 'Re: ' + subject;
       }
 
-      // Extract Message-ID for threading
-      const messageIdHeader = `<${originalEmail.id}@mail.gmail.com>`;
+      const messageIdHeader = originalEmail.messageId || `<${originalEmail.id}@mail.gmail.com>`;
 
-      // Send the reply
       return await this.sendEmail({
         to,
         subject,
@@ -503,33 +361,555 @@ class GmailService {
     }
   }
 
-  async summarizeEmails(emails) {
-    // Simple summarization - can be enhanced with AI
-    const summary = {
-      total: emails.length,
-      senders: [...new Set(emails.map(e => e.from))],
-      subjects: emails.map(e => e.subject),
-      unread: emails.filter(e => e.labelIds?.includes('UNREAD')).length,
-      important: emails.filter(e => e.labelIds?.includes('IMPORTANT')).length,
-      recent: emails.filter(e => {
-        const emailDate = new Date(e.date);
-        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        return emailDate > oneDayAgo;
-      }).length
-    };
-
-    return summary;
-  }
-
-  async createCalendarEvent({ summary, description, start, end, timezone, attendees, location, reminders }) {
-    if (!this.calendar) {
-      throw new Error('Calendar not authenticated');
-    }
+  async forwardEmail(emailId, to, text, html) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
-      // Build start object
+      const originalEmail = await this.getEmailById(emailId);
+
+      let subject = originalEmail.subject;
+      if (!subject.toLowerCase().startsWith('fwd:')) {
+        subject = 'Fwd: ' + subject;
+      }
+
+      // Add forwarding context
+      const forwardedText = `
+---------- Forwarded message ---------
+From: ${originalEmail.from}
+Date: ${originalEmail.date}
+Subject: ${originalEmail.subject}
+To: ${originalEmail.to}
+
+${originalEmail.body}
+`;
+
+      const finalText = text ? `${text}\n\n${forwardedText}` : forwardedText;
+
+      return await this.sendEmail({
+        to,
+        subject,
+        text: finalText,
+        html
+      });
+    } catch (error) {
+      console.error('Failed to forward email:', error);
+      throw new Error('Failed to forward email');
+    }
+  }
+
+  // ==================== DRAFT OPERATIONS ====================
+
+  async createDraft({ to, subject, text, cc, bcc, html }) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const headers = [
+        `To: ${to}`,
+        `Subject: ${subject}`
+      ];
+
+      if (cc) headers.push(`Cc: ${cc}`);
+      if (bcc) headers.push(`Bcc: ${bcc}`);
+
+      let body = headers.join('\r\n') + '\r\n\r\n' + text;
+
+      const encodedEmail = Buffer.from(body)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
+
+      const result = await this.gmail.users.drafts.create({
+        userId: 'me',
+        requestBody: {
+          message: {
+            raw: encodedEmail
+          }
+        }
+      });
+
+      return {
+        id: result.data.id,
+        message: result.data.message
+      };
+    } catch (error) {
+      console.error('Failed to create draft:', error);
+      throw new Error('Failed to create draft');
+    }
+  }
+
+  async listDrafts(maxResults = 10) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const response = await this.gmail.users.drafts.list({
+        userId: 'me',
+        maxResults
+      });
+
+      if (!response.data.drafts) return [];
+
+      const drafts = [];
+      for (const draft of response.data.drafts) {
+        const fullDraft = await this.gmail.users.drafts.get({
+          userId: 'me',
+          id: draft.id
+        });
+        drafts.push({
+          id: fullDraft.data.id,
+          message: await this.getEmailById(fullDraft.data.message.id)
+        });
+      }
+
+      return drafts;
+    } catch (error) {
+      console.error('Failed to list drafts:', error);
+      throw new Error('Failed to list drafts');
+    }
+  }
+
+  async updateDraft(draftId, { to, subject, text, cc, bcc }) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      // Delete old draft and create new one
+      await this.deleteDraft(draftId);
+      return await this.createDraft({ to, subject, text, cc, bcc });
+    } catch (error) {
+      console.error('Failed to update draft:', error);
+      throw new Error('Failed to update draft');
+    }
+  }
+
+  async sendDraft(draftId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const result = await this.gmail.users.drafts.send({
+        userId: 'me',
+        requestBody: {
+          id: draftId
+        }
+      });
+
+      return {
+        id: result.data.id,
+        threadId: result.data.threadId,
+        labelIds: result.data.labelIds
+      };
+    } catch (error) {
+      console.error('Failed to send draft:', error);
+      throw new Error('Failed to send draft');
+    }
+  }
+
+  async deleteDraft(draftId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.drafts.delete({
+        userId: 'me',
+        id: draftId
+      });
+
+      return { success: true, id: draftId };
+    } catch (error) {
+      console.error('Failed to delete draft:', error);
+      throw new Error('Failed to delete draft');
+    }
+  }
+
+  // ==================== EMAIL MANAGEMENT ====================
+
+  async deleteEmail(emailId, permanent = false) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      if (permanent) {
+        await this.gmail.users.messages.delete({
+          userId: 'me',
+          id: emailId
+        });
+      } else {
+        await this.gmail.users.messages.trash({
+          userId: 'me',
+          id: emailId
+        });
+      }
+
+      return { success: true, id: emailId, permanent };
+    } catch (error) {
+      console.error('Failed to delete email:', error);
+      throw new Error('Failed to delete email');
+    }
+  }
+
+  async archiveEmail(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: ['INBOX']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to archive email:', error);
+      throw new Error('Failed to archive email');
+    }
+  }
+
+  async markAsRead(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: ['UNREAD']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to mark as read:', error);
+      throw new Error('Failed to mark as read');
+    }
+  }
+
+  async markAsUnread(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['UNREAD']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to mark as unread:', error);
+      throw new Error('Failed to mark as unread');
+    }
+  }
+
+  async starEmail(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['STARRED']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to star email:', error);
+      throw new Error('Failed to star email');
+    }
+  }
+
+  async unstarEmail(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: ['STARRED']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to unstar email:', error);
+      throw new Error('Failed to unstar email');
+    }
+  }
+
+  async markAsImportant(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['IMPORTANT']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to mark as important:', error);
+      throw new Error('Failed to mark as important');
+    }
+  }
+
+  async markAsSpam(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: ['SPAM'],
+          removeLabelIds: ['INBOX']
+        }
+      });
+
+      return { success: true, id: emailId };
+    } catch (error) {
+      console.error('Failed to mark as spam:', error);
+      throw new Error('Failed to mark as spam');
+    }
+  }
+
+  // ==================== LABEL OPERATIONS ====================
+
+  async addLabel(emailId, labelId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          addLabelIds: [labelId]
+        }
+      });
+
+      return { success: true, id: emailId, labelId };
+    } catch (error) {
+      console.error('Failed to add label:', error);
+      throw new Error('Failed to add label');
+    }
+  }
+
+  async removeLabel(emailId, labelId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.modify({
+        userId: 'me',
+        id: emailId,
+        requestBody: {
+          removeLabelIds: [labelId]
+        }
+      });
+
+      return { success: true, id: emailId, labelId };
+    } catch (error) {
+      console.error('Failed to remove label:', error);
+      throw new Error('Failed to remove label');
+    }
+  }
+
+  async listLabels() {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const response = await this.gmail.users.labels.list({
+        userId: 'me'
+      });
+
+      return response.data.labels || [];
+    } catch (error) {
+      console.error('Failed to list labels:', error);
+      throw new Error('Failed to list labels');
+    }
+  }
+
+  async createLabel(name, labelListVisibility = 'labelShow', messageListVisibility = 'show') {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const result = await this.gmail.users.labels.create({
+        userId: 'me',
+        requestBody: {
+          name,
+          labelListVisibility,
+          messageListVisibility
+        }
+      });
+
+      return result.data;
+    } catch (error) {
+      console.error('Failed to create label:', error);
+      throw new Error('Failed to create label');
+    }
+  }
+
+  // ==================== BULK OPERATIONS ====================
+
+  async bulkArchive(emailIds) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.batchModify({
+        userId: 'me',
+        requestBody: {
+          ids: emailIds,
+          removeLabelIds: ['INBOX']
+        }
+      });
+
+      return { success: true, count: emailIds.length };
+    } catch (error) {
+      console.error('Failed to bulk archive:', error);
+      throw new Error('Failed to bulk archive');
+    }
+  }
+
+  async bulkDelete(emailIds, permanent = false) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      if (permanent) {
+        await this.gmail.users.messages.batchDelete({
+          userId: 'me',
+          requestBody: {
+            ids: emailIds
+          }
+        });
+      } else {
+        await this.gmail.users.messages.batchModify({
+          userId: 'me',
+          requestBody: {
+            ids: emailIds,
+            addLabelIds: ['TRASH'],
+            removeLabelIds: ['INBOX']
+          }
+        });
+      }
+
+      return { success: true, count: emailIds.length, permanent };
+    } catch (error) {
+      console.error('Failed to bulk delete:', error);
+      throw new Error('Failed to bulk delete');
+    }
+  }
+
+  async bulkMarkAsRead(emailIds) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      await this.gmail.users.messages.batchModify({
+        userId: 'me',
+        requestBody: {
+          ids: emailIds,
+          removeLabelIds: ['UNREAD']
+        }
+      });
+
+      return { success: true, count: emailIds.length };
+    } catch (error) {
+      console.error('Failed to bulk mark as read:', error);
+      throw new Error('Failed to bulk mark as read');
+    }
+  }
+
+  // ==================== ATTACHMENT OPERATIONS ====================
+
+  async getAttachment(messageId, attachmentId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const attachment = await this.gmail.users.messages.attachments.get({
+        userId: 'me',
+        messageId,
+        id: attachmentId
+      });
+
+      return {
+        data: attachment.data.data, // base64 encoded
+        size: attachment.data.size
+      };
+    } catch (error) {
+      console.error('Failed to get attachment:', error);
+      throw new Error('Failed to get attachment');
+    }
+  }
+
+  // ==================== ANALYTICS ====================
+
+  async getEmailAnalytics(days = 30) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const after = Math.floor(Date.now() / 1000) - (days * 24 * 60 * 60);
+      const response = await this.gmail.users.messages.list({
+        userId: 'me',
+        q: `after:${after}`,
+        maxResults: 500
+      });
+
+      if (!response.data.messages) {
+        return {
+          totalEmails: 0,
+          topSenders: [],
+          averageResponseTime: null,
+          unreadCount: 0
+        };
+      }
+
+      // Fetch details for analysis
+      const emails = [];
+      for (const message of response.data.messages.slice(0, 100)) {
+        const email = await this.getEmailById(message.id);
+        emails.push(email);
+      }
+
+      // Analyze senders
+      const senderCounts = {};
+      for (const email of emails) {
+        const sender = email.from;
+        senderCounts[sender] = (senderCounts[sender] || 0) + 1;
+      }
+
+      const topSenders = Object.entries(senderCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([sender, count]) => ({ sender, count }));
+
+      const unreadCount = emails.filter(e => !e.isRead).length;
+
+      return {
+        totalEmails: response.data.messages.length,
+        topSenders,
+        unreadCount,
+        readRate: ((emails.length - unreadCount) / emails.length * 100).toFixed(1) + '%'
+      };
+    } catch (error) {
+      console.error('Failed to get analytics:', error);
+      throw new Error('Failed to get analytics');
+    }
+  }
+
+  // ==================== CALENDAR OPERATIONS ====================
+
+  async createCalendarEvent({ summary, description, start, end, timezone, attendees, location, reminders }) {
+    if (!this.calendar) throw new Error('Calendar not authenticated');
+
+    try {
       const startObj = {};
-      if (start.dateTime) {
+      if (typeof start === 'string') {
+        startObj.dateTime = start;
+        startObj.timeZone = timezone || 'America/Los_Angeles';
+      } else if (start.dateTime) {
         startObj.dateTime = start.dateTime;
         startObj.timeZone = timezone || 'America/Los_Angeles';
       } else if (start.date) {
@@ -538,9 +918,11 @@ class GmailService {
         throw new Error('Start date/dateTime is required');
       }
 
-      // Build end object
       const endObj = {};
-      if (end.dateTime) {
+      if (typeof end === 'string') {
+        endObj.dateTime = end;
+        endObj.timeZone = timezone || 'America/Los_Angeles';
+      } else if (end.dateTime) {
         endObj.dateTime = end.dateTime;
         endObj.timeZone = timezone || 'America/Los_Angeles';
       } else if (end.date) {
@@ -557,12 +939,10 @@ class GmailService {
         end: endObj
       };
 
-      // Add attendees if provided
       if (attendees && attendees.length > 0) {
         event.attendees = attendees.map(email => ({ email }));
       }
 
-      // Add reminders if provided
       if (reminders) {
         event.reminders = {
           useDefault: false,
@@ -593,9 +973,7 @@ class GmailService {
   }
 
   async listCalendarEvents({ timeMin, timeMax, maxResults = 10, query }) {
-    if (!this.calendar) {
-      throw new Error('Calendar not authenticated');
-    }
+    if (!this.calendar) throw new Error('Calendar not authenticated');
 
     try {
       const params = {
@@ -635,14 +1013,13 @@ class GmailService {
   }
 
   async addActionItemToCalendar(actionItem, dueDate, priority = 'medium') {
-    // Create a calendar event for an action item
-    const reminderMinutes = priority === 'high' ? [60, 1440] : [1440]; // 1 hour and 1 day for high, just 1 day for others
+    const reminderMinutes = priority === 'high' ? [60, 1440] : [1440];
 
     const start = new Date(dueDate);
-    const end = new Date(start.getTime() + 30 * 60000); // 30 minutes duration
+    const end = new Date(start.getTime() + 30 * 60000);
 
     return await this.createCalendarEvent({
-      summary: `Action: ${actionItem}`,
+      summary: `📋 Action: ${actionItem}`,
       description: `Priority: ${priority}\n\nAction item created by Mayler voice assistant.`,
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() },
@@ -650,83 +1027,24 @@ class GmailService {
     });
   }
 
-  async updateCalendarEvent(eventId, updates) {
-    if (!this.calendar) {
-      throw new Error('Calendar not authenticated');
-    }
+  // ==================== HELPER METHODS ====================
 
-    try {
-      // First get the existing event
-      const existing = await this.calendar.events.get({
-        calendarId: 'primary',
-        eventId: eventId
-      });
+  _extractParts(payload) {
+    const parts = [];
 
-      const event = existing.data;
-
-      // Apply updates
-      if (updates.summary) event.summary = updates.summary;
-      if (updates.description) event.description = updates.description;
-      if (updates.location) event.location = updates.location;
-      
-      if (updates.start) {
-        if (typeof updates.start === 'string') {
-          event.start = { dateTime: updates.start, timeZone: event.start?.timeZone || 'America/Los_Angeles' };
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        if (part.parts) {
+          parts.push(...this._extractParts(part));
         } else {
-          event.start = updates.start;
+          parts.push(part);
         }
       }
-      
-      if (updates.end) {
-        if (typeof updates.end === 'string') {
-          event.end = { dateTime: updates.end, timeZone: event.end?.timeZone || 'America/Los_Angeles' };
-        } else {
-          event.end = updates.end;
-        }
-      }
-
-      if (updates.attendees) {
-        event.attendees = updates.attendees.map(email => 
-          typeof email === 'string' ? { email } : email
-        );
-      }
-
-      const result = await this.calendar.events.update({
-        calendarId: 'primary',
-        eventId: eventId,
-        requestBody: event
-      });
-
-      return {
-        success: true,
-        id: result.data.id,
-        htmlLink: result.data.htmlLink,
-        summary: result.data.summary,
-        start: result.data.start,
-        end: result.data.end
-      };
-    } catch (error) {
-      console.error('Failed to update calendar event:', error);
-      throw new Error('Failed to update calendar event: ' + error.message);
-    }
-  }
-
-  async deleteCalendarEvent(eventId) {
-    if (!this.calendar) {
-      throw new Error('Calendar not authenticated');
+    } else {
+      parts.push(payload);
     }
 
-    try {
-      await this.calendar.events.delete({
-        calendarId: 'primary',
-        eventId: eventId
-      });
-
-      return { success: true, id: eventId, action: 'deleted' };
-    } catch (error) {
-      console.error('Failed to delete calendar event:', error);
-      throw new Error('Failed to delete calendar event: ' + error.message);
-    }
+    return parts;
   }
 }
 

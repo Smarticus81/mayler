@@ -151,6 +151,45 @@ const WebRTCApp: React.FC = () => {
   const recognizerRef = useRef<SpeechRecognition | null>(null);
   const wakeRunningRef = useRef<boolean>(false);
 
+  // Play instant chime for wake word feedback
+  const playWakeChime = useCallback(() => {
+    if (!audioContextRef.current) return;
+
+    try {
+      const ctx = audioContextRef.current;
+      const now = ctx.currentTime;
+
+      // Create a pleasant two-tone chime (C5 -> E5)
+      const oscillator1 = ctx.createOscillator();
+      const oscillator2 = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+
+      // First tone (C5 - 523.25 Hz)
+      oscillator1.type = 'sine';
+      oscillator1.frequency.setValueAtTime(523.25, now);
+
+      // Second tone (E5 - 659.25 Hz) - starts slightly after
+      oscillator2.type = 'sine';
+      oscillator2.frequency.setValueAtTime(659.25, now + 0.05);
+
+      // Gentle envelope
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.15, now + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+      oscillator1.connect(gainNode);
+      oscillator2.connect(gainNode);
+      gainNode.connect(ctx.destination);
+
+      oscillator1.start(now);
+      oscillator1.stop(now + 0.2);
+      oscillator2.start(now + 0.05);
+      oscillator2.stop(now + 0.4);
+    } catch (error) {
+      console.error('Failed to play wake chime:', error);
+    }
+  }, []);
+
   // Initialize Audio Context
   useEffect(() => {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -194,6 +233,16 @@ const WebRTCApp: React.FC = () => {
       }
 
       if (data.authUrl) {
+        // Check for PWA standalone mode
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+          (window.navigator as any).standalone === true;
+
+        if (isStandalone) {
+          console.log('[OAuth] PWA Standalone mode detected - using redirect');
+          window.location.href = data.authUrl;
+          return;
+        }
+
         console.log('[OAuth] Opening popup with URL:', data.authUrl);
         // Open in a new window/tab
         const width = 600;
@@ -289,6 +338,18 @@ const WebRTCApp: React.FC = () => {
         const data = await safeJson(resp);
 
         if (resp.ok && data.authUrl) {
+          // Check for PWA standalone mode
+          const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+            (window.navigator as any).standalone === true;
+
+          if (isStandalone) {
+            window.location.href = data.authUrl;
+            return {
+              success: true,
+              message: 'Redirecting to Google authentication...'
+            };
+          }
+
           // Open in a new window/tab
           const width = 600;
           const height = 700;
@@ -527,6 +588,50 @@ const WebRTCApp: React.FC = () => {
         });
         return await safeJson(resp);
       }
+      case 'reply_to_email': {
+        const resp = await fetch(`/api/gmail/reply/${a.emailId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: a.text, html: a.html }),
+        });
+        return await safeJson(resp);
+      }
+      case 'get_email_by_id': {
+        const resp = await fetch(`/api/gmail/email/${a.emailId}`);
+        return await safeJson(resp);
+      }
+      case 'summarize_emails': {
+        const resp = await fetch('/api/gmail/summarize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ maxResults: (a.maxResults as number | undefined) ?? 10 }),
+        });
+        return await safeJson(resp);
+      }
+      case 'search_images': {
+        const resp = await fetch('/api/search/images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+        });
+        return await safeJson(resp);
+      }
+      case 'search_videos': {
+        const resp = await fetch('/api/search/videos', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+        });
+        return await safeJson(resp);
+      }
+      case 'get_factual_info': {
+        const resp = await fetch('/api/search/facts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: a.query }),
+        });
+        return await safeJson(resp);
+      }
       default:
         return { error: `Unknown tool: ${name}` };
     }
@@ -604,6 +709,9 @@ IMPORTANT LISTENING BEHAVIOR:
           { type: 'function', name: 'mark_email_unread', description: 'Marks an email as unread.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
           { type: 'function', name: 'star_email', description: 'Stars an email.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
           { type: 'function', name: 'archive_email', description: 'Archives an email (removes from inbox).', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
+          { type: 'function', name: 'reply_to_email', description: 'Replies to a specific email thread.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'ID of the email to reply to' }, text: { type: 'string', description: 'Plain text reply content' }, html: { type: 'string', description: 'Optional HTML reply content' } }, required: ['emailId', 'text'] } },
+          { type: 'function', name: 'get_email_by_id', description: 'Gets full details of a specific email by its ID.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'ID of the email to retrieve' } }, required: ['emailId'] } },
+          { type: 'function', name: 'summarize_emails', description: 'Provides a summary of recent emails including total count, senders, and important emails.', parameters: { type: 'object', properties: { maxResults: { type: 'number', description: 'Maximum number of emails to analyze (default 10)' } } } },
 
           // Calendar CRUD Operations
           { type: 'function', name: 'create_calendar_event', description: "Creates a new event in the user's Google Calendar.", parameters: { type: 'object', properties: { summary: { type: 'string', description: 'Title of the event' }, description: { type: 'string', description: 'Description or details of the event' }, start: { type: 'string', description: 'Start time in ISO 8601 format' }, end: { type: 'string', description: 'End time in ISO 8601 format' }, location: { type: 'string', description: 'Location of the event' }, attendees: { type: 'array', items: { type: 'string' }, description: 'List of email addresses to invite' } }, required: ['summary', 'start', 'end'] } },
@@ -618,6 +726,9 @@ IMPORTANT LISTENING BEHAVIOR:
           { type: 'function', name: 'get_weather', description: 'Gets current weather for a location.', parameters: { type: 'object', properties: { location: { type: 'string' }, units: { type: 'string' } }, required: ['location'] } },
           { type: 'function', name: 'wikipedia_search', description: 'Searches Wikipedia for information on a topic.', parameters: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
           { type: 'function', name: 'get_definition', description: 'Gets the dictionary definition of a word.', parameters: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'] } },
+          { type: 'function', name: 'get_factual_info', description: 'Gets factual information from Wikipedia and other sources about a topic.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Topic to get factual information about' } }, required: ['query'] } },
+          { type: 'function', name: 'search_images', description: 'Searches for images on the web. Requires SERPER_API_KEY to be configured.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Image search query' }, maxResults: { type: 'number', description: 'Maximum number of images to return (default 5)' } }, required: ['query'] } },
+          { type: 'function', name: 'search_videos', description: 'Searches for videos on the web. Requires SERPER_API_KEY to be configured.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'Video search query' }, maxResults: { type: 'number', description: 'Maximum number of videos to return (default 5)' } }, required: ['query'] } },
 
           // Data & Calculations
           { type: 'function', name: 'calculate', description: 'Performs mathematical calculations.', parameters: { type: 'object', properties: { expression: { type: 'string' } }, required: ['expression'] } },
@@ -1072,6 +1183,7 @@ IMPORTANT LISTENING BEHAVIOR:
         if (isFinal || results[idx][0].confidence > 0.5) {
           if (detectWakeWord(transcript)) {
             console.log('[Wake Word] Wake word detected, entering command mode');
+            playWakeChime(); // Instant audio feedback
             setIsWakeMode(false); // Enter command mode
             stopWakeRecognition();
             handleStartListening();
@@ -1260,7 +1372,9 @@ IMPORTANT LISTENING BEHAVIOR:
       <main className="main-content">
         {/* Logo/Name */}
         <div className="brand">
+          <img src="/mayler-logo.png" alt="Mayler" className="brand-logo" />
           <h1 className="brand-name">mayler</h1>
+          <p className="brand-tagline">your zen email assistant</p>
         </div>
 
         {/* Orb visualization */}
