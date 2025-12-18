@@ -1,8 +1,13 @@
 import React from 'react';
-import WebRTCApp from './WebRTCApp';
+import { MaylerProvider } from './context/MaylerContext';
+import { MainLayout } from './layout/MainLayout';
 
 const App: React.FC = () => {
-    return <WebRTCApp />;
+    return (
+        <MaylerProvider>
+            <MainLayout />
+        </MaylerProvider>
+    );
 };
 
 export default App;
