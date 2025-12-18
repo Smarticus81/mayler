@@ -21,13 +21,13 @@ export const SettingsModal: React.FC = () => {
         ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
     return (
-        <div className="settings-overlay">
-            <div className="settings-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="settings-panel">
+            <div className="settings-content" onClick={(e) => e.stopPropagation()}>
                 <div className="settings-header">
                     <h2>Settings</h2>
                 </div>
 
-                <div className="settings-content">
+                <div className="settings-sections">
                     <div className="setting-section">
                         <h3>Voice Engine</h3>
                         <div className="voice-grid">
