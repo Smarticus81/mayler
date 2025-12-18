@@ -236,8 +236,9 @@ export const useWebRTC = () => {
             await pc.setLocalDescription(offer);
 
             const baseUrl = 'https://api.openai.com/v1/realtime';
-            // Use the model returned by the server to ensure consistency with the token.
-            const url = `${baseUrl}?model=${modelName}`;
+            // The ephemeral token ALREADY contains the model configuration.
+            // Appending ?model=... again causes a 400 Bad Request/Conflict.
+            const url = baseUrl;
 
             const sdpResp = await fetch(url, {
                 method: 'POST',
