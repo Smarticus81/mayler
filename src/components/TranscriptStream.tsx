@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { cleanText } from '../utils/stringUtils';
 
@@ -11,36 +11,32 @@ export const TranscriptStream: React.FC = () => {
         connected,
     } = useMayler();
 
-    const scrollRef = useRef<HTMLDivElement>(null);
+    // Determine the "current" message to display
+    // Priority: Interim (User/Agent) > Final (Agent) > Final (User)
+    let activeMessage: { text: string; source: 'user' | 'agent' | 'system'; isInterim: boolean } | null = null;
 
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [transcript, interimTranscript, agentTranscript, agentInterimTranscript]);
+    if (agentInterimTranscript) {
+        activeMessage = { text: agentInterimTranscript, source: 'agent', isInterim: true };
+    } else if (interimTranscript) {
+        activeMessage = { text: interimTranscript, source: 'user', isInterim: true };
+    } else if (agentTranscript) {
+        activeMessage = { text: agentTranscript, source: 'agent', isInterim: false };
+    } else if (transcript) {
+        activeMessage = { text: transcript, source: 'user', isInterim: false };
+    }
 
     if (!connected) return null;
 
     return (
-        <div className="transcript-area" ref={scrollRef}>
-            {agentTranscript && (
-                <div className="transcript agent">
-                    <span className="transcript-text">{cleanText(agentTranscript)}</span>
-                </div>
-            )}
-            {agentInterimTranscript && (
-                <div className="transcript agent interim">
-                    <span className="transcript-text">{cleanText(agentInterimTranscript)}</span>
-                </div>
-            )}
-            {transcript && (
-                <div className="transcript user">
-                    <span className="transcript-text">{cleanText(transcript)}</span>
-                </div>
-            )}
-            {interimTranscript && (
-                <div className="transcript user interim">
-                    <span className="transcript-text">{cleanText(interimTranscript)}</span>
+        <div className="transcript-area">
+            {/* We only render the active message. The CSS transitions handle the 'pop' effect if we key it properly, 
+                 but for a simple fix to prevent overlap, we ensure only one div is 'active' at a time.
+                 To enable true cross-fading, we would need a transition group, but CSS absolute positioning + opacity 
+                 switching works well for 'zen' minimalism. */}
+
+            {activeMessage && (
+                <div key="active-message" className={`transcript active ${activeMessage.source} ${activeMessage.isInterim ? 'interim' : ''}`}>
+                    <span className="transcript-text">{cleanText(activeMessage.text)}</span>
                 </div>
             )}
         </div>

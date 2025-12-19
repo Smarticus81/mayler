@@ -41,7 +41,22 @@ export const useWebRTC = () => {
         sendEvent({
             type: 'session.update',
             session: {
-                instructions: `You are mayler, a laid-back but professional AI assistant.`,
+                instructions: `You are Mayler, an advanced intelligent voice interface. 
+You are currently in COMMAND MODE. The user has just spoken the wake word.
+
+CORE BEHAVIOR RULES:
+1. BE CONCISE: Keep responses extremely short and conversational.
+2. COMMAND MODE: Execute tools immediately when asked.
+3. TERMINATION: If the user says "Goodbye", "Bye", "Stop listening", "Shutdown", or "Go to sleep":
+   - Say "Goodbye" briefly.
+   - Then immediately call the 'disconnect_session' tool or stop responding.
+   - Do NOT ask for confirmation. Just stop.
+
+4. PERSONALITY: Professional, helpful, zen, and laid-back.
+5. TOOLS: Use Gmail, Calendar, and Search tools proactively.
+   - If authentication fails, ask the user to "Connect Google Account" in settings.
+
+Your goal is to be the ultimate helpful assistant.`,
                 modalities: modalities,
                 input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
                 turn_detection: {
@@ -56,6 +71,15 @@ export const useWebRTC = () => {
         });
     }, [sendEvent, selectedVoice, toolkitDefinitions, voiceEngine]);
 
+    const disconnect = useCallback(() => {
+        dcRef.current?.close();
+        pcRef.current?.close();
+        localStreamRef.current?.getTracks().forEach(t => t.stop());
+        setConnected(false);
+        setSpeaking(false);
+        setListening(false);
+    }, [setConnected, setSpeaking, setListening]);
+
     const handleFunctionCall = useCallback(async (call_id: string, name: string, rawArgs: unknown) => {
         let args: unknown = rawArgs;
         if (typeof rawArgs === 'string') {
@@ -68,6 +92,12 @@ export const useWebRTC = () => {
 
         const result = await runTool(name, args);
 
+        if (name === 'disconnect_session') {
+            // We perform the physical disconnect after a short delay 
+            // to allow the model to speak a goodbye if it wants
+            setTimeout(() => disconnect(), 500);
+        }
+
         sendEvent({
             type: 'conversation.item.create',
             item: {
@@ -77,7 +107,7 @@ export const useWebRTC = () => {
             },
         });
         sendEvent({ type: 'response.create' });
-    }, [runTool, sendEvent]);
+    }, [runTool, sendEvent, disconnect]);
 
     const connect = useCallback(async (shouldGreet = false) => {
         setLoading(true);
@@ -220,7 +250,9 @@ export const useWebRTC = () => {
             await pc.setLocalDescription(offer);
 
             // Correct endpoint for WebRTC SDP exchange with standard Realtime API
-            const url = 'https://api.openai.com/v1/realtime/calls';
+            const baseUrl = 'https://api.openai.com/v1/realtime';
+            const modelParam = modelName ? `?model=${modelName}` : '';
+            const url = `${baseUrl}${modelParam}`;
 
             const sdpResp = await fetch(url, {
                 method: 'POST',
@@ -250,14 +282,7 @@ export const useWebRTC = () => {
         }
     }, [setConnected, setLoading, setError, configureSession, sendEvent, setSpeaking, setListening, setAgentInterimTranscript, setAgentTranscript, setInterimTranscript, setTranscript, speaking, handleFunctionCall]);
 
-    const disconnect = useCallback(() => {
-        dcRef.current?.close();
-        pcRef.current?.close();
-        localStreamRef.current?.getTracks().forEach(t => t.stop());
-        setConnected(false);
-        setSpeaking(false);
-        setListening(false);
-    }, [setConnected, setSpeaking, setListening]);
+
 
     return {
         connect,

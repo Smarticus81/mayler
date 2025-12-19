@@ -299,6 +299,15 @@ export const useToolkit = () => {
                 });
                 return await safeJson(resp);
             }
+            case 'disconnect_session': {
+                // This is a client-side signal; the component using this hook 
+                // should listen for this call or we just return a special signal.
+                // In this architecture, returning a specific success message is enough
+                // for the model to know it "worked", but the actual disconnect
+                // needs to happen in the UI layer or via an event listener.
+                // For now, we will assume the model stops context.
+                return { success: true, message: 'Session disconnected' };
+            }
             default:
                 return { error: `Unknown tool: ${name}` };
         }
@@ -309,12 +318,12 @@ export const useToolkit = () => {
         { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
 
         // Gmail CRUD Operations
-        { type: 'function', name: 'get_emails', description: "Retrieves recent emails from the user's Gmail inbox.", parameters: { type: 'object', properties: { maxResults: { type: 'number' } } } },
-        { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
+        { type: 'function', name: 'get_emails', description: "Retrieves recent emails from the user's Gmail inbox.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 20 } } } },
+        { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number', default: 50 } }, required: ['query'] } },
         { type: 'function', name: 'send_email', description: 'Sends a new email via Gmail.', parameters: { type: 'object', properties: { to: { type: 'string', description: 'Recipient email address' }, subject: { type: 'string', description: 'Email subject' }, text: { type: 'string', description: 'Email body text' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] } },
         { type: 'function', name: 'reply_to_email', description: 'Replies to an existing email by its ID.', parameters: { type: 'object', properties: { emailId: { type: 'string' }, text: { type: 'string', description: 'Reply body text' } }, required: ['emailId', 'text'] } },
         { type: 'function', name: 'get_email_by_id', description: 'Retrieves a specific email by its unique ID.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
-        { type: 'function', name: 'summarize_emails', description: 'Summarizes recent emails from the inbox.', parameters: { type: 'object', properties: { maxResults: { type: 'number' } } } },
+        { type: 'function', name: 'summarize_emails', description: 'Summarizes recent emails from the inbox.', parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 20 } } } },
         { type: 'function', name: 'delete_email', description: 'Deletes or trashes an email in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
         { type: 'function', name: 'mark_email_read', description: 'Marks an email as read in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
         { type: 'function', name: 'mark_email_unread', description: 'Marks an email as unread in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string' } }, required: ['emailId'] } },
@@ -350,6 +359,8 @@ export const useToolkit = () => {
         // Financial
         { type: 'function', name: 'get_stock_price', description: 'Gets current stock price for a symbol.', parameters: { type: 'object', properties: { symbol: { type: 'string' } }, required: ['symbol'] } },
         { type: 'function', name: 'get_crypto_price', description: 'Gets current cryptocurrency price.', parameters: { type: 'object', properties: { symbol: { type: 'string' }, currency: { type: 'string' } }, required: ['symbol'] } },
+        // System
+        { type: 'function', name: 'disconnect_session', description: 'Disconnects and ends the current voice session immediately.', parameters: { type: 'object', properties: {} } },
     ];
 
     return {

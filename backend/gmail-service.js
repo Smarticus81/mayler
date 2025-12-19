@@ -13,7 +13,6 @@ const SCOPES = [
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.compose', // For drafts
   'https://www.googleapis.com/auth/gmail.labels', // For labels
-  'https://www.googleapis.com/auth/gmail.metadata', // For metadata
   'https://www.googleapis.com/auth/calendar',
   'https://www.googleapis.com/auth/calendar.events'
 ];
@@ -125,7 +124,7 @@ class GmailService {
 
   // ==================== EMAIL READ OPERATIONS ====================
 
-  async getRecentEmails(maxResults = 10) {
+  async getRecentEmails(maxResults = 50) {
     if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
@@ -138,19 +137,19 @@ class GmailService {
       if (!response.data.messages) return [];
 
       const emails = [];
-      for (const message of response.data.messages.slice(0, Math.min(maxResults, 10))) {
+      for (const message of response.data.messages.slice(0, Math.min(maxResults, 50))) {
         const email = await this.getEmailById(message.id);
         emails.push(email);
       }
 
       return emails;
     } catch (error) {
-      console.error('Failed to get emails:', error);
-      throw new Error('Failed to retrieve emails');
+      console.error('Failed to get emails:', error?.message || error);
+      throw new Error(`Failed to retrieve emails: ${error?.message || 'Unknown error'}`);
     }
   }
 
-  async searchEmails(query, maxResults = 5) {
+  async searchEmails(query, maxResults = 25) {
     if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {

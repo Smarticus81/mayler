@@ -55,20 +55,13 @@ async function createOpenAIRealtimeEphemeralToken() {
   // Mint an ephemeral client secret on the server using a standard API key.
   // The browser uses the ephemeral key to connect directly to Realtime via WebRTC.
   const sessionConfig = {
-    session: {
-      type: 'realtime',
-      model,
-      audio: {
-        output: {
-          voice,
-        },
-      },
-    },
+    model,
+    voice,
   };
 
   console.log('[Server] Minting ephemeral token with config:', JSON.stringify(sessionConfig, null, 2));
 
-  const resp = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+  const resp = await fetch('https://api.openai.com/v1/realtime/sessions', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${openaiApiKey}`,
