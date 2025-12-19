@@ -219,10 +219,8 @@ export const useWebRTC = () => {
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            const baseUrl = 'https://api.openai.com/v1/realtime';
-            // The ephemeral token ALREADY contains the model configuration.
-            // Appending ?model=... again causes a 400 Bad Request/Conflict.
-            const url = baseUrl;
+            // Correct endpoint for WebRTC SDP exchange with standard Realtime API
+            const url = 'https://api.openai.com/v1/realtime/calls';
 
             const sdpResp = await fetch(url, {
                 method: 'POST',
