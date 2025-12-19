@@ -36,28 +36,21 @@ export const useWebRTC = () => {
     }, []);
 
     const configureSession = useCallback(() => {
-        const modalities = voiceEngine === 'openai' ? ['audio'] : ['text'];
+        const modalities = voiceEngine === 'openai' ? ['text', 'audio'] : ['text'];
 
         sendEvent({
             type: 'session.update',
             session: {
-                type: 'realtime',
                 instructions: `You are mayler, a laid-back but professional AI assistant.`,
-                output_modalities: modalities,
-                audio: {
-                    input: {
-                        transcription: { model: 'gpt-4o-mini-transcribe' },
-                        turn_detection: {
-                            type: 'server_vad',
-                            threshold: 0.4,
-                            prefix_padding_ms: 200,
-                            silence_duration_ms: 400,
-                        },
-                    },
-                    output: {
-                        voice: selectedVoice,
-                    },
+                modalities: modalities,
+                input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+                turn_detection: {
+                    type: 'server_vad',
+                    threshold: 0.5,
+                    prefix_padding_ms: 300,
+                    silence_duration_ms: 500,
                 },
+                voice: selectedVoice,
                 tools: toolkitDefinitions,
             },
         });
@@ -116,6 +109,13 @@ export const useWebRTC = () => {
                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
             });
             pcRef.current = pc;
+
+            // Handle incoming tracks from OpenAI
+            pc.ontrack = (e) => {
+                if (remoteAudioElRef.current) {
+                    remoteAudioElRef.current.srcObject = e.streams[0];
+                }
+            };
 
             const dc = pc.createDataChannel('oai-events', { ordered: true });
             dcRef.current = dc;
@@ -214,7 +214,7 @@ export const useWebRTC = () => {
 
             const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
             localStreamRef.current = ms;
-            pc.addTrack(ms.getTracks()[0]);
+            ms.getTracks().forEach(track => pc.addTrack(track, ms));
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
