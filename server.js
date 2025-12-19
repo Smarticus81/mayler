@@ -722,7 +722,7 @@ app.post('/api/crypto', async (req, res) => {
 app.post('/api/time', async (req, res) => {
   try {
     const { timezone } = req.body;
-    if (!timezone) return res.status(400).json({ error: 'Timezone required' });
+    // Timezone is optional now, defaults to UTC in service
     const result = utilityService.getTime(timezone);
     res.json(result);
   } catch (error) {

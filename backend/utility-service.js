@@ -10,16 +10,16 @@ class UtilityService {
   async getWeather(location, units = 'fahrenheit') {
     try {
       const unitParam = units === 'celsius' ? 'metric' : 'imperial';
-      
+
       if (this.weatherApiKey) {
         const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(location)}&units=${unitParam}&appid=${this.weatherApiKey}`;
         const response = await fetch(url);
         const data = await response.json();
-        
+
         if (data.cod !== 200) {
           throw new Error(data.message || 'Weather data not found');
         }
-        
+
         return {
           location: data.name,
           country: data.sys?.country,
@@ -31,16 +31,16 @@ class UtilityService {
           units: units === 'celsius' ? 'C' : 'F'
         };
       }
-      
+
       // Fallback: use wttr.in (free, no API key)
       const wttrUrl = `https://wttr.in/${encodeURIComponent(location)}?format=j1`;
       const response = await fetch(wttrUrl);
       const data = await response.json();
-      
+
       const current = data.current_condition[0];
       const temp = units === 'celsius' ? current.temp_C : current.temp_F;
       const feelsLike = units === 'celsius' ? current.FeelsLikeC : current.FeelsLikeF;
-      
+
       return {
         location: data.nearest_area[0]?.areaName[0]?.value || location,
         country: data.nearest_area[0]?.country[0]?.value,
@@ -76,14 +76,14 @@ class UtilityService {
         .replace(/round/gi, 'Math.round')
         .replace(/\bpi\b/gi, 'Math.PI')
         .replace(/\be\b/gi, 'Math.E');
-      
+
       // Use Function constructor for safer eval
       const result = new Function(`"use strict"; return (${sanitized})`)();
-      
+
       if (typeof result !== 'number' || !isFinite(result)) {
         throw new Error('Invalid result');
       }
-      
+
       return {
         expression,
         result: Number.isInteger(result) ? result : parseFloat(result.toFixed(10))
@@ -105,7 +105,7 @@ class UtilityService {
       'cm_inches': (v) => v / 2.54,
       'yards_meters': (v) => v * 0.9144,
       'meters_yards': (v) => v / 0.9144,
-      
+
       // Weight
       'kg_lbs': (v) => v * 2.20462,
       'lbs_kg': (v) => v / 2.20462,
@@ -115,15 +115,15 @@ class UtilityService {
       'ounces_grams': (v) => v / 0.035274,
       'oz_grams': (v) => v * 28.3495,
       'grams_oz': (v) => v / 28.3495,
-      
+
       // Temperature
-      'celsius_fahrenheit': (v) => (v * 9/5) + 32,
-      'fahrenheit_celsius': (v) => (v - 32) * 5/9,
-      'c_f': (v) => (v * 9/5) + 32,
-      'f_c': (v) => (v - 32) * 5/9,
+      'celsius_fahrenheit': (v) => (v * 9 / 5) + 32,
+      'fahrenheit_celsius': (v) => (v - 32) * 5 / 9,
+      'c_f': (v) => (v * 9 / 5) + 32,
+      'f_c': (v) => (v - 32) * 5 / 9,
       'celsius_kelvin': (v) => v + 273.15,
       'kelvin_celsius': (v) => v - 273.15,
-      
+
       // Volume
       'liters_gallons': (v) => v * 0.264172,
       'gallons_liters': (v) => v / 0.264172,
@@ -131,19 +131,19 @@ class UtilityService {
       'oz_ml': (v) => v / 0.033814,
       'cups_ml': (v) => v * 236.588,
       'ml_cups': (v) => v / 236.588,
-      
+
       // Speed
       'mph_kph': (v) => v * 1.60934,
       'kph_mph': (v) => v / 1.60934,
       'mps_mph': (v) => v * 2.23694,
       'mph_mps': (v) => v / 2.23694,
-      
+
       // Area
       'sqft_sqm': (v) => v * 0.092903,
       'sqm_sqft': (v) => v / 0.092903,
       'acres_hectares': (v) => v * 0.404686,
       'hectares_acres': (v) => v / 0.404686,
-      
+
       // Digital storage
       'mb_gb': (v) => v / 1024,
       'gb_mb': (v) => v * 1024,
@@ -151,7 +151,7 @@ class UtilityService {
       'tb_gb': (v) => v * 1024,
       'kb_mb': (v) => v / 1024,
       'mb_kb': (v) => v * 1024,
-      
+
       // Time
       'hours_minutes': (v) => v * 60,
       'minutes_hours': (v) => v / 60,
@@ -160,11 +160,11 @@ class UtilityService {
       'weeks_days': (v) => v * 7,
       'days_weeks': (v) => v / 7,
     };
-    
+
     const fromNorm = from.toLowerCase().replace(/[^a-z]/g, '');
     const toNorm = to.toLowerCase().replace(/[^a-z]/g, '');
     const key = `${fromNorm}_${toNorm}`;
-    
+
     if (conversions[key]) {
       const result = conversions[key](value);
       return {
@@ -174,7 +174,7 @@ class UtilityService {
         result: parseFloat(result.toFixed(6))
       };
     }
-    
+
     throw new Error(`Conversion from ${from} to ${to} not supported`);
   }
 
@@ -184,13 +184,13 @@ class UtilityService {
       const url = `https://api.exchangerate.host/convert?from=${from.toUpperCase()}&to=${to.toUpperCase()}&amount=${amount}`;
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (!data.success && !data.result) {
         // Fallback API
         const fallbackUrl = `https://open.er-api.com/v6/latest/${from.toUpperCase()}`;
         const fallbackResp = await fetch(fallbackUrl);
         const fallbackData = await fallbackResp.json();
-        
+
         if (fallbackData.rates && fallbackData.rates[to.toUpperCase()]) {
           const rate = fallbackData.rates[to.toUpperCase()];
           return {
@@ -203,7 +203,7 @@ class UtilityService {
         }
         throw new Error('Currency conversion failed');
       }
-      
+
       return {
         amount,
         from: from.toUpperCase(),
@@ -224,7 +224,7 @@ class UtilityService {
         const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol.toUpperCase()}&apikey=${this.alphaVantageKey}`;
         const response = await fetch(url);
         const data = await response.json();
-        
+
         const quote = data['Global Quote'];
         if (quote && quote['05. price']) {
           return {
@@ -239,14 +239,14 @@ class UtilityService {
           };
         }
       }
-      
+
       // Fallback: Yahoo Finance API (unofficial)
       const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol.toUpperCase()}?interval=1d&range=1d`;
       const response = await fetch(yahooUrl, {
         headers: { 'User-Agent': 'Mozilla/5.0' }
       });
       const data = await response.json();
-      
+
       const result = data.chart?.result?.[0];
       if (result) {
         const meta = result.meta;
@@ -254,7 +254,7 @@ class UtilityService {
         const currentPrice = meta.regularMarketPrice;
         const change = currentPrice - prevClose;
         const changePercent = ((change / prevClose) * 100).toFixed(2);
-        
+
         return {
           symbol: symbol.toUpperCase(),
           price: currentPrice,
@@ -266,7 +266,7 @@ class UtilityService {
           currency: meta.currency
         };
       }
-      
+
       throw new Error('Stock data not found');
     } catch (error) {
       console.error('Stock price error:', error);
@@ -295,14 +295,14 @@ class UtilityService {
         'BCH': 'bitcoin-cash',
         'SHIB': 'shiba-inu'
       };
-      
+
       const coinId = symbolMap[symbol.toUpperCase()] || symbol.toLowerCase();
       const curr = currency.toLowerCase();
-      
+
       const url = `https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=${curr}&include_24hr_change=true&include_market_cap=true`;
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data[coinId]) {
         const priceData = data[coinId];
         return {
@@ -313,7 +313,7 @@ class UtilityService {
           currency: currency.toUpperCase()
         };
       }
-      
+
       throw new Error('Cryptocurrency not found');
     } catch (error) {
       console.error('Crypto price error:', error);
@@ -326,14 +326,14 @@ class UtilityService {
     try {
       const url = `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`;
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         throw new Error('Word not found');
       }
-      
+
       const data = await response.json();
       const entry = data[0];
-      
+
       const definitions = [];
       for (const meaning of entry.meanings.slice(0, 3)) {
         definitions.push({
@@ -343,7 +343,7 @@ class UtilityService {
           synonyms: meaning.synonyms?.slice(0, 5)
         });
       }
-      
+
       return {
         word: entry.word,
         phonetic: entry.phonetic || entry.phonetics?.[0]?.text,
@@ -361,13 +361,13 @@ class UtilityService {
     try {
       const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
       const response = await fetch(url);
-      
+
       if (!response.ok) {
         // Try search API
         const searchUrl = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=1&format=json`;
         const searchResp = await fetch(searchUrl);
         const searchData = await searchResp.json();
-        
+
         if (searchData[1] && searchData[1][0]) {
           const exactUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(searchData[1][0])}`;
           const exactResp = await fetch(exactUrl);
@@ -383,7 +383,7 @@ class UtilityService {
         }
         throw new Error('Article not found');
       }
-      
+
       const data = await response.json();
       return {
         title: data.title,
@@ -398,7 +398,7 @@ class UtilityService {
   }
 
   // Time in timezone
-  getTime(timezone) {
+  getTime(timezone = 'UTC') {
     try {
       // Normalize timezone input
       const tzMap = {
@@ -432,9 +432,10 @@ class UtilityService {
         'chicago': 'America/Chicago',
         'denver': 'America/Denver'
       };
-      
-      const tz = tzMap[timezone.toLowerCase()] || timezone;
-      
+
+      const tzInput = timezone ? timezone.toLowerCase() : 'utc';
+      const tz = tzMap[tzInput] || timezone || 'UTC';
+
       const now = new Date();
       const options = {
         timeZone: tz,
@@ -447,10 +448,10 @@ class UtilityService {
         second: '2-digit',
         hour12: true
       };
-      
+
       const formatter = new Intl.DateTimeFormat('en-US', options);
       const formatted = formatter.format(now);
-      
+
       return {
         timezone: tz,
         datetime: formatted,
@@ -478,7 +479,7 @@ class UtilityService {
           format: 'text'
         })
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         return {
@@ -488,12 +489,12 @@ class UtilityService {
           targetLang
         };
       }
-      
+
       // Fallback: MyMemory API (free, limited)
       const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang === 'auto' ? 'autodetect' : sourceLang}|${targetLang}`;
       const mmResponse = await fetch(myMemoryUrl);
       const mmData = await mmResponse.json();
-      
+
       if (mmData.responseStatus === 200) {
         return {
           originalText: text,
@@ -502,7 +503,7 @@ class UtilityService {
           targetLang
         };
       }
-      
+
       throw new Error('Translation failed');
     } catch (error) {
       console.error('Translation error:', error);
@@ -514,7 +515,7 @@ class UtilityService {
   setTimer(duration, label = '') {
     const now = new Date();
     const endTime = new Date(now.getTime() + duration * 1000);
-    
+
     return {
       duration,
       label,
@@ -540,7 +541,7 @@ class UtilityService {
       content,
       createdAt: new Date().toISOString()
     };
-    
+
     return {
       success: true,
       note,
