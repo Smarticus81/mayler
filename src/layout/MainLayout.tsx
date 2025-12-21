@@ -10,10 +10,9 @@ import { BrandHeader } from '../components/BrandHeader';
 
 export const MainLayout: React.FC = () => {
     const { connected, setShowSettings, error } = useMayler();
-    const { connect, disconnect, remoteAudioElRef } = useWebRTC();
+    const { connect, disconnect, remoteAudioElRef, audioLevel } = useWebRTC();
     const { initAudioContext, playWakeChime } = useAudio();
     const [isActive, setIsActive] = useState(false);
-    const [audioLevel] = useState(0);
 
     const handleStart = () => {
         initAudioContext();

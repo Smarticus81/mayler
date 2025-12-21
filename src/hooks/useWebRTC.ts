@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useState } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useToolkit } from './useToolkit';
 import { asObject, asString } from '../utils/jsonUtils';
@@ -29,6 +29,7 @@ export const useWebRTC = () => {
     const remoteAudioElRef = useRef<HTMLAudioElement | null>(null);
 
     const shouldGreetOnConnectRef = useRef<boolean>(false);
+    const [audioLevel, setAudioLevel] = useState(0);
 
     const sendEvent = useCallback((event: JSONObject) => {
         if (!dcRef.current || dcRef.current.readyState !== 'open') return;
@@ -142,12 +143,47 @@ Your goal is to be the ultimate helpful assistant.`,
 
             // Handle incoming tracks from OpenAI
             pc.ontrack = (e) => {
+                const stream = e.streams[0];
                 if (remoteAudioElRef.current) {
-                    remoteAudioElRef.current.srcObject = e.streams[0];
+                    remoteAudioElRef.current.srcObject = stream;
+                }
+
+                // Audio Analysis for VoiceOrb
+                try {
+                    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                    const audioCtx = new AudioContextClass();
+                    const analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 256;
+                    const source = audioCtx.createMediaStreamSource(stream);
+                    source.connect(analyser);
+
+                    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                    const updateLevel = () => {
+                        if (pcRef.current?.connectionState !== 'connected') {
+                            audioCtx.close();
+                            return;
+                        }
+                        analyser.getByteFrequencyData(dataArray);
+                        // Calculate average volume
+                        let sum = 0;
+                        for (let i = 0; i < dataArray.length; i++) {
+                            sum += dataArray[i];
+                        }
+                        const average = sum / dataArray.length;
+                        // Normalize to 0-1 range roughly
+                        // 0-255 -> 0-1
+                        setAudioLevel(Math.min(1, average / 50)); // boost sensitivity
+                        requestAnimationFrame(updateLevel);
+                    };
+                    updateLevel();
+                } catch (err) {
+                    console.error('Audio analysis failed:', err);
                 }
             };
 
             const dc = pc.createDataChannel('oai-events', { ordered: true });
+
             dcRef.current = dc;
 
             dc.onopen = () => {
@@ -289,5 +325,6 @@ Your goal is to be the ultimate helpful assistant.`,
         disconnect,
         sendEvent,
         remoteAudioElRef,
+        audioLevel,
     };
 };
