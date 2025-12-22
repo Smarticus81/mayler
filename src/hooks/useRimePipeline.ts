@@ -87,13 +87,23 @@ Your goal is to be the ultimate helpful assistant.`
         try {
             setAgentInterimTranscript('Thinking...');
 
+            // Transform tools to match OpenAI Chat API format
+            const formattedTools = toolkitDefinitions.map(tool => ({
+                type: 'function',
+                function: {
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.parameters
+                }
+            }));
+
             // Send to OpenAI Chat API
             const response = await fetch('/api/chat/completion', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     messages: conversationRef.current,
-                    tools: toolkitDefinitions,
+                    tools: formattedTools,
                 }),
             });
 
