@@ -13,6 +13,7 @@ import { createCalendarRouter } from './backend/routes/calendar.js';
 import { createUtilityRouter } from './backend/routes/utility.js';
 import { createSearchRouter } from './backend/routes/search.js';
 import { createChatRouter } from './backend/routes/chat.js';
+import { createAuthRouter } from './backend/routes/auth.js';
 
 // Load environment variables
 dotenv.config();
@@ -43,8 +44,10 @@ const calendarRouter = createCalendarRouter(gmailService);
 const utilityRouter = createUtilityRouter(utilityService);
 const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
+const authRouter = createAuthRouter();
 
 // Mount Routes
+app.use('/api/auth', authRouter);
 app.use('/api/token', tokenRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/calendar', calendarRouter);
