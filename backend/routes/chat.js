@@ -20,10 +20,16 @@ export const createChatRouter = () => {
             };
 
             // Only add tools if they exist
-            if (tools && tools.length > 0) {
+            if (tools && Array.isArray(tools) && tools.length > 0) {
                 requestBody.tools = tools;
                 requestBody.tool_choice = 'auto';
             }
+
+            console.log('[Chat API] Request:', {
+                messageCount: messages?.length,
+                toolCount: tools?.length || 0,
+                hasTools: !!tools
+            });
 
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
@@ -49,8 +55,9 @@ export const createChatRouter = () => {
                 finish_reason: choice.finish_reason,
             });
         } catch (error) {
-            console.error('Chat completion error:', error);
-            res.status(500).json({ error: error.message });
+            console.error('[Chat API] Error:', error.message);
+            console.error('[Chat API] Stack:', error.stack);
+            res.status(500).json({ error: error.message || 'Unknown error' });
         }
     });
 
