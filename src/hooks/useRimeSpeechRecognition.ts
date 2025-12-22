@@ -78,15 +78,15 @@ export const useRimeSpeechRecognition = () => {
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error, event.message);
 
-            // Don't stop on "no-speech" errors, just continue
-            if (event.error === 'no-speech') {
+            // Don't try to restart on these errors
+            if (event.error === 'no-speech' || event.error === 'aborted') {
                 return;
             }
 
-            // For other errors, try to restart
-            if (event.error !== 'aborted') {
+            // For network errors, try to restart after a delay
+            if (event.error === 'network') {
                 setTimeout(() => {
-                    if (recognitionRef.current && isListening) {
+                    if (recognitionRef.current === recognition) {
                         try {
                             recognition.start();
                         } catch (e) {
@@ -100,8 +100,8 @@ export const useRimeSpeechRecognition = () => {
         recognition.onend = () => {
             console.log('Speech recognition ended');
 
-            // Auto-restart for continuous listening if still supposed to be listening
-            if (recognitionRef.current && isListening) {
+            // Only auto-restart if we're still connected and the ref exists
+            if (recognitionRef.current === recognition) {
                 try {
                     recognition.start();
                 } catch (e) {

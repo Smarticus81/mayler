@@ -12,6 +12,8 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
     const { wakeWordEnabled, isWakeMode } = useMayler();
     const recognizerRef = useRef<any>(null);
     const wakeRunningRef = useRef(false);
+    const lastWakeTimeRef = useRef(0);
+    const DEBOUNCE_MS = 3000; // 3 seconds between wake word triggers
 
     const detectWakeWord = useCallback((transcript: string) => {
         const s = sanitize(transcript);
@@ -46,9 +48,16 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
 
             if (isFinal || results[idx][0].confidence > 0.5) {
                 if (detectWakeWord(transcript)) {
-                    onChime();
-                    onWake();
-                    stopWakeRecognition();
+                    // Debounce: only trigger if enough time has passed
+                    const now = Date.now();
+                    if (now - lastWakeTimeRef.current > DEBOUNCE_MS) {
+                        lastWakeTimeRef.current = now;
+                        onChime();
+                        onWake();
+                        stopWakeRecognition();
+                    } else {
+                        console.log('[Wake Word] Debounced - too soon after last trigger');
+                    }
                 }
             }
         };
