@@ -12,6 +12,7 @@ import { createGmailRouter } from './backend/routes/gmail.js';
 import { createCalendarRouter } from './backend/routes/calendar.js';
 import { createUtilityRouter } from './backend/routes/utility.js';
 import { createSearchRouter } from './backend/routes/search.js';
+import { createChatRouter } from './backend/routes/chat.js';
 
 // Load environment variables
 dotenv.config();
@@ -41,6 +42,7 @@ const gmailRouter = createGmailRouter(gmailService);
 const calendarRouter = createCalendarRouter(gmailService);
 const utilityRouter = createUtilityRouter(utilityService);
 const searchRouter = createSearchRouter(searchService);
+const chatRouter = createChatRouter();
 
 // Mount Routes
 app.use('/api/token', tokenRouter);
@@ -48,6 +50,7 @@ app.use('/api/gmail', gmailRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api', utilityRouter); // Mounts utility routes directly under /api (e.g. /api/weather)
 app.use('/api', searchRouter);  // Mounts search routes directly under /api (e.g. /api/search)
+app.use('/api/chat', chatRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));

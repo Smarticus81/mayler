@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
 import type { GoogleStatus, VoiceOption, VoiceEngine } from '../types';
 
@@ -61,13 +61,41 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [agentTranscript, setAgentTranscript] = useState('');
     const [agentInterimTranscript, setAgentInterimTranscript] = useState('');
 
-    const [wakeWordEnabled, setWakeWordEnabled] = useState(true);
+    const [wakeWordEnabled, setWakeWordEnabled] = useState(() => {
+        const stored = localStorage.getItem('mayler_wake_word');
+        return stored !== 'false'; // default true
+    });
     const [googleStatus, setGoogleStatus] = useState<GoogleStatus>('unknown');
-    const [selectedVoice, setSelectedVoice] = useState<VoiceOption>('alloy');
-    const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>('openai');
+    const [selectedVoice, setSelectedVoice] = useState<VoiceOption>(() => {
+        const stored = localStorage.getItem('mayler_voice');
+        return (stored as VoiceOption) || 'alloy';
+    });
+    const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
+        const stored = localStorage.getItem('mayler_engine');
+        return (stored as VoiceEngine) || 'openai';
+    });
 
-    const [rimeSpeakerId, setRimeSpeakerId] = useState<string>('marsh');
+    const [rimeSpeakerId, setRimeSpeakerId] = useState<string>(() => {
+        return localStorage.getItem('mayler_rime_speaker') || 'marsh';
+    });
     const [showSettings, setShowSettings] = useState(false);
+
+    // Persist settings to localStorage
+    useEffect(() => {
+        localStorage.setItem('mayler_wake_word', String(wakeWordEnabled));
+    }, [wakeWordEnabled]);
+
+    useEffect(() => {
+        localStorage.setItem('mayler_voice', selectedVoice);
+    }, [selectedVoice]);
+
+    useEffect(() => {
+        localStorage.setItem('mayler_engine', voiceEngine);
+    }, [voiceEngine]);
+
+    useEffect(() => {
+        localStorage.setItem('mayler_rime_speaker', rimeSpeakerId);
+    }, [rimeSpeakerId]);
 
     const value = {
         connected, setConnected,

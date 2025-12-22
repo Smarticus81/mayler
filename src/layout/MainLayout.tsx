@@ -3,14 +3,23 @@ import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { useRimePipeline } from '../hooks/useRimePipeline';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { TranscriptStream } from '../components/TranscriptStream';
 import { SettingsModal } from '../components/SettingsModal';
 import { BrandHeader } from '../components/BrandHeader';
 
 export const MainLayout: React.FC = () => {
-    const { connected, setShowSettings, error } = useMayler();
-    const { connect, disconnect, remoteAudioElRef, audioLevel } = useWebRTC();
+    const { connected, setShowSettings, error, voiceEngine } = useMayler();
+
+    // Use different pipelines based on voice engine
+    const webrtcPipeline = useWebRTC();
+    const rimePipeline = useRimePipeline();
+
+    // Select the active pipeline
+    const pipeline = voiceEngine === 'rime' ? rimePipeline : webrtcPipeline;
+    const { connect, disconnect, remoteAudioElRef, audioLevel } = pipeline;
+
     const { initAudioContext, playWakeChime } = useAudio();
     const [isActive, setIsActive] = useState(false);
 
