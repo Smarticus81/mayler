@@ -44,7 +44,7 @@ export const MainLayout: React.FC = () => {
             }
         },
         playWakeChime,
-        isActive
+        isActive && !connected
     );
 
     return (
