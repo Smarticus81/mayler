@@ -29,16 +29,19 @@ export const MainLayout: React.FC = () => {
     };
 
     // Initialize wake word detection and start detection only when active
-    useWakeWord(
+    const { stopWakeRecognition } = useWakeWord(
         () => {
             if (!isActive) return;
             console.log('Wake word detected! Connecting...');
 
-            // For Rime pipeline, add a small delay to let wake word fully stop
+            // For Rime pipeline, we MUST stop wake recognition explicitly and immediately
             if (voiceEngine === 'rime') {
+                // Stop the wake word listener manually to free up the mic
+                stopWakeRecognition();
+
                 setTimeout(() => {
-                    connect();
-                }, 400);
+                    connect(); /* Connect to Rime */
+                }, 800); // Increased delay to be safe
             } else {
                 connect();
             }
