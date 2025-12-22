@@ -17,6 +17,7 @@ export const useRimeSpeechRecognition = () => {
     const [interimTranscript, setInterimTranscript] = useState('');
     const [isSupported, setIsSupported] = useState(false);
     const onTranscriptCallbackRef = useRef<((text: string) => void) | null>(null);
+    const shouldRestartRef = useRef(false);
 
     useEffect(() => {
         // Check browser support
@@ -33,6 +34,7 @@ export const useRimeSpeechRecognition = () => {
         }
 
         onTranscriptCallbackRef.current = onTranscript;
+        shouldRestartRef.current = true;
 
         const recognition = new SpeechRecognition();
         recognition.continuous = true;
@@ -78,35 +80,29 @@ export const useRimeSpeechRecognition = () => {
         recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
             console.error('Speech recognition error:', event.error, event.message);
 
-            // Don't try to restart on these errors
-            if (event.error === 'no-speech' || event.error === 'aborted') {
+            // Stop auto-restart on abort errors
+            if (event.error === 'aborted') {
+                shouldRestartRef.current = false;
                 return;
             }
 
-            // For network errors, try to restart after a delay
-            if (event.error === 'network') {
-                setTimeout(() => {
-                    if (recognitionRef.current === recognition) {
-                        try {
-                            recognition.start();
-                        } catch (e) {
-                            console.error('Failed to restart recognition:', e);
-                        }
-                    }
-                }, 1000);
+            // Don't restart on no-speech
+            if (event.error === 'no-speech') {
+                return;
             }
         };
 
         recognition.onend = () => {
             console.log('Speech recognition ended');
 
-            // Only auto-restart if we're still connected and the ref exists
-            if (recognitionRef.current === recognition) {
+            // Only restart if we should and the ref matches
+            if (shouldRestartRef.current && recognitionRef.current === recognition) {
                 try {
                     recognition.start();
                 } catch (e) {
                     console.error('Failed to restart recognition:', e);
                     setIsListening(false);
+                    shouldRestartRef.current = false;
                 }
             } else {
                 setIsListening(false);
@@ -119,9 +115,10 @@ export const useRimeSpeechRecognition = () => {
         } catch (error) {
             console.error('Failed to start speech recognition:', error);
         }
-    }, [isListening]);
+    }, []);
 
     const stopListening = useCallback(() => {
+        shouldRestartRef.current = false;
         if (recognitionRef.current) {
             try {
                 recognitionRef.current.stop();
