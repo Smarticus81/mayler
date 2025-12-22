@@ -27,8 +27,10 @@ export const createUtilityRouter = (utilityService) => {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Rime API error');
+                const errorText = await response.text();
+                console.error('Rime API Error Status:', response.status);
+                console.error('Rime API Error Body:', errorText);
+                throw new Error(`Rime API error: ${response.status} - ${errorText}`);
             }
 
             const { audioContent } = await response.json();
