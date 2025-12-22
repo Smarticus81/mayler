@@ -41,6 +41,8 @@ interface MaylerContextType {
 
     rimeSpeakerId: string;
     setRimeSpeakerId: Dispatch<SetStateAction<string>>;
+    rimeModelId: string;
+    setRimeModelId: Dispatch<SetStateAction<string>>;
     showSettings: boolean;
     setShowSettings: Dispatch<SetStateAction<boolean>>;
 }
