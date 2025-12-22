@@ -35,9 +35,8 @@ console.log('Services loaded');
 
 // Enable CORS for all routes
 app.use(cors());
-app.use(express.json());
-
-// Initialize Routers
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const tokenRouter = createTokenRouter();
 const gmailRouter = createGmailRouter(gmailService);
 const calendarRouter = createCalendarRouter(gmailService);
