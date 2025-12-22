@@ -13,17 +13,28 @@ export const createUtilityRouter = (utilityService) => {
         }
 
         try {
+            const modelId = req.body.modelId || 'mist-v2';
+            const requestBody = {
+                text,
+                speaker: speakerId || 'marsh',
+                modelId: modelId
+            };
+
+            // Add Arcana-specific parameters if using arcana model
+            if (modelId === 'arcana') {
+                requestBody.samplingRate = 24000;
+                requestBody.temperature = 0.5;
+                requestBody.repetition_penalty = 1.5;
+                requestBody.top_p = 1;
+            }
+
             const response = await fetch('https://users.rime.ai/v1/rime-tts', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${apiKey}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    text,
-                    speaker: speakerId || 'marsh',
-                    modelId: req.body.modelId || 'mist-v2'
-                })
+                body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
