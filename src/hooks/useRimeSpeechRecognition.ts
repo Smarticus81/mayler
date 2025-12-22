@@ -63,15 +63,18 @@ export const useRimeSpeechRecognition = () => {
             }
 
             if (interimText) {
+                console.log('[Speech Recognition] Interim:', interimText);
                 setInterimTranscript(interimText);
             }
 
             if (finalText.trim()) {
                 const cleanText = finalText.trim();
+                console.log('[Speech Recognition] Final:', cleanText);
                 setTranscript(cleanText);
                 setInterimTranscript('');
 
                 if (onTranscriptCallbackRef.current) {
+                    console.log('[Speech Recognition] Calling callback with:', cleanText);
                     onTranscriptCallbackRef.current(cleanText);
                 }
             }
