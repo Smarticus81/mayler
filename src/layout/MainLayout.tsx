@@ -3,21 +3,16 @@ import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
 import { useWebRTC } from '../hooks/useWebRTC';
-import { useRimePipeline } from '../hooks/useRimePipeline';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { TranscriptStream } from '../components/TranscriptStream';
 import { SettingsModal } from '../components/SettingsModal';
 import { BrandHeader } from '../components/BrandHeader';
 
 export const MainLayout: React.FC = () => {
-    const { connected, setShowSettings, error, voiceEngine } = useMayler();
+    const { connected, setShowSettings, error } = useMayler();
 
-    // Use different pipelines based on voice engine
-    const webrtcPipeline = useWebRTC();
-    const rimePipeline = useRimePipeline();
-
-    // Select the active pipeline
-    const pipeline = voiceEngine === 'rime' ? rimePipeline : webrtcPipeline;
+    // Use WebRTC pipeline
+    const pipeline = useWebRTC();
     const { connect, disconnect, remoteAudioElRef, audioLevel } = pipeline;
 
     const { initAudioContext, playWakeChime } = useAudio();
@@ -29,22 +24,11 @@ export const MainLayout: React.FC = () => {
     };
 
     // Initialize wake word detection and start detection only when active
-    const { stopWakeRecognition } = useWakeWord(
+    useWakeWord(
         () => {
             if (!isActive) return;
             console.log('Wake word detected! Connecting...');
-
-            // For Rime pipeline, we MUST stop wake recognition explicitly and immediately
-            if (voiceEngine === 'rime') {
-                // Stop the wake word listener manually to free up the mic
-                stopWakeRecognition();
-
-                setTimeout(() => {
-                    connect(); /* Connect to Rime */
-                }, 1000); // 1s safe delay
-            } else {
-                connect();
-            }
+            connect();
         },
         playWakeChime,
         isActive && !connected

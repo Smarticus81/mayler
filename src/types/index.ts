@@ -8,9 +8,9 @@ export interface ChatMessage {
 
 export type GoogleStatus = 'unknown' | 'available' | 'unavailable';
 
-export type VoiceOption = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
+export type VoiceOption = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'sage' | 'shimmer' | 'verse' | 'marin' | 'cedar';
 
-export type VoiceEngine = 'openai' | 'rime';
+export type VoiceEngine = 'openai';
 
 export interface WebRTCSessionConfig {
     voice: VoiceOption;

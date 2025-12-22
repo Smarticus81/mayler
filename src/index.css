@@ -394,6 +394,8 @@ body {
   margin-bottom: 4px;
 }
 
+
+
 .brand-svg {
   display: none;
 }
@@ -408,18 +410,19 @@ body {
 }
 
 .brand-m {
-  font-size: 38px;
-  font-weight: 400;
+  font-size: 48px;
+  font-weight: 600;
   color: #CC5500;
   /* Burnt Orange */
-  margin-right: 1px;
+  margin-right: -2px;
+  text-shadow: 0 2px 4px rgba(204, 85, 0, 0.2);
 }
 
 .brand-ayler {
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 300;
   color: var(--text-primary);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.04em;
   line-height: 1;
 }
 
@@ -860,54 +863,43 @@ body {
 
 .primary-btn {
   position: relative;
-  background: linear-gradient(135deg, var(--primary) 0%, #8A9A85 100%);
-  color: #fff;
-  border: none;
-  padding: 16px 48px;
+  background: rgba(255, 255, 255, 0.4);
+  color: var(--text-secondary);
+  border: 1px solid rgba(168, 181, 160, 0.2);
+  padding: 14px 40px;
   border-radius: 100px;
   font-family: 'Outfit', sans-serif;
-  font-size: 16px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.5s var(--ease-smooth);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
 
-  .primary-btn {
-    position: relative;
-    background: rgba(255, 255, 255, 0.4);
-    color: var(--text-secondary);
-    border: 1px solid rgba(168, 181, 160, 0.2);
-    padding: 14px 40px;
-    border-radius: 100px;
-    font-family: 'Outfit', sans-serif;
-    font-size: 14px;
-    font-weight: 300;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.5s var(--ease-smooth);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
+.primary-btn:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 4px 20px rgba(168, 181, 160, 0.15);
+  transform: translateY(-1px);
+}
+
+.primary-btn.pulse {
+  animation: breathe-btn 4s infinite ease-in-out;
+}
+
+@keyframes breathe-btn {
+
+  0%,
+  100% {
+    border-color: rgba(168, 181, 160, 0.2);
   }
 
-  .primary-btn:hover {
-    background: rgba(255, 255, 255, 0.8);
-    border-color: var(--primary);
-    color: var(--primary);
-    box-shadow: 0 4px 20px rgba(168, 181, 160, 0.15);
-    transform: translateY(-1px);
+  50% {
+    border-color: rgba(168, 181, 160, 0.6);
+    box-shadow: 0 0 15px rgba(168, 181, 160, 0.1);
   }
-
-  .primary-btn.pulse {
-    animation: breathe-btn 4s infinite ease-in-out;
-  }
-
-  @keyframes breathe-btn {
-
-    0%,
-    100% {
-      border-color: rgba(168, 181, 160, 0.2);
-    }
-
-    50% {
-      border-color: rgba(168, 181, 160, 0.6);
-      box-shadow: 0 0 15px rgba(168, 181, 160, 0.1);
-    }
-  }
+}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAuth } from '../hooks/useAuth';
+import type { VoiceOption } from '../types';
 
 export const SettingsModal: React.FC = () => {
     const {
@@ -8,18 +9,14 @@ export const SettingsModal: React.FC = () => {
         wakeWordEnabled, setWakeWordEnabled,
         googleStatus,
         selectedVoice, setSelectedVoice,
-        voiceEngine, setVoiceEngine,
-
-        rimeSpeakerId, setRimeSpeakerId,
-        rimeModelId, setRimeModelId
     } = useMayler();
 
     const { triggerGoogleAuth } = useAuth();
 
     if (!showSettings) return null;
 
-    const voices: Array<'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'> =
-        ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+    const voices: Array<VoiceOption> =
+        ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
 
     return (
         <div className="settings-panel" onClick={() => setShowSettings(false)}>
@@ -30,74 +27,18 @@ export const SettingsModal: React.FC = () => {
 
                 <div className="settings-sections">
                     <div className="setting-section">
-                        <h3>Voice Engine</h3>
+                        <h3>Voice Choice</h3>
                         <div className="voice-grid">
-                            <button
-                                className={`voice-btn ${voiceEngine === 'openai' ? 'active' : ''}`}
-                                onClick={() => setVoiceEngine('openai')}
-                            >
-                                OpenAI (Fast)
-                            </button>
-
-                            <button
-                                className={`voice-btn ${voiceEngine === 'rime' ? 'active' : ''}`}
-                                onClick={() => setVoiceEngine('rime')}
-                            >
-                                Rime (Instant)
-                            </button>
+                            {voices.map((voice) => (
+                                <button
+                                    key={voice}
+                                    className={`voice-btn ${selectedVoice === voice ? 'active' : ''}`}
+                                    onClick={() => setSelectedVoice(voice)}
+                                >
+                                    {voice.charAt(0).toUpperCase() + voice.slice(1)}
+                                </button>
+                            ))}
                         </div>
-                    </div>
-
-                    <div className="setting-section">
-                        <h3>
-                            {voiceEngine === 'openai' ? 'OpenAI Voice' :
-                                voiceEngine === 'rime' ? 'Rime Speaker' : 'Unknown'}
-
-                        </h3>
-                        {voiceEngine === 'openai' ? (
-                            <div className="voice-grid">
-                                {voices.map((voice) => (
-                                    <button
-                                        key={voice}
-                                        className={`voice-btn ${selectedVoice === voice ? 'active' : ''}`}
-                                        onClick={() => setSelectedVoice(voice)}
-                                    >
-                                        {voice.charAt(0).toUpperCase() + voice.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="voice-grid">
-                                {['marsh', 'lagoon', 'moon', 'sky', 'amber'].map((speaker) => (
-                                    <button
-                                        key={speaker}
-                                        className={`voice-btn ${rimeSpeakerId === speaker ? 'active' : ''}`}
-                                        onClick={() => setRimeSpeakerId(speaker)}
-                                    >
-                                        {speaker.charAt(0).toUpperCase() + speaker.slice(1)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        {voiceEngine === 'rime' && (
-                            <div style={{ marginTop: '15px' }}>
-                                <h4>Model</h4>
-                                <div className="voice-grid">
-                                    <button
-                                        className={`voice-btn ${rimeModelId === 'mist-v2' ? 'active' : ''}`}
-                                        onClick={() => setRimeModelId('mist-v2')}
-                                    >
-                                        Mist v2 (Fast)
-                                    </button>
-                                    <button
-                                        className={`voice-btn ${rimeModelId === 'arcana' ? 'active' : ''}`}
-                                        onClick={() => setRimeModelId('arcana')}
-                                    >
-                                        Arcana (Quality)
-                                    </button>
-                                </div>
-                            </div>
-                        )}
                     </div>
 
                     <div className="setting-section">

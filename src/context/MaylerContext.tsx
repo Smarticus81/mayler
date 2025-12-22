@@ -39,10 +39,7 @@ interface MaylerContextType {
     voiceEngine: VoiceEngine;
     setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
 
-    rimeSpeakerId: string;
-    setRimeSpeakerId: Dispatch<SetStateAction<string>>;
-    rimeModelId: string;
-    setRimeModelId: Dispatch<SetStateAction<string>>;
+
     showSettings: boolean;
     setShowSettings: Dispatch<SetStateAction<boolean>>;
 }
@@ -69,20 +66,19 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
     const [googleStatus, setGoogleStatus] = useState<GoogleStatus>('unknown');
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>(() => {
+        const supportedVoices: VoiceOption[] = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
         const stored = localStorage.getItem('mayler_voice');
-        return (stored as VoiceOption) || 'alloy';
+        if (stored && supportedVoices.includes(stored as VoiceOption)) {
+            return stored as VoiceOption;
+        }
+        return 'alloy';
     });
     const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
         const stored = localStorage.getItem('mayler_engine');
         return (stored as VoiceEngine) || 'openai';
     });
 
-    const [rimeSpeakerId, setRimeSpeakerId] = useState<string>(() => {
-        return localStorage.getItem('mayler_rime_speaker') || 'marsh';
-    });
-    const [rimeModelId, setRimeModelId] = useState<string>(() => {
-        return localStorage.getItem('mayler_rime_model') || 'mist-v2';
-    });
+
     const [showSettings, setShowSettings] = useState(false);
 
     // Persist settings to localStorage
@@ -98,13 +94,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         localStorage.setItem('mayler_engine', voiceEngine);
     }, [voiceEngine]);
 
-    useEffect(() => {
-        localStorage.setItem('mayler_rime_speaker', rimeSpeakerId);
-    }, [rimeSpeakerId]);
 
-    useEffect(() => {
-        localStorage.setItem('mayler_rime_model', rimeModelId);
-    }, [rimeModelId]);
 
     const value = {
         connected, setConnected,
@@ -122,8 +112,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
 
-        rimeSpeakerId, setRimeSpeakerId,
-        rimeModelId, setRimeModelId,
+
         showSettings, setShowSettings,
     };
 

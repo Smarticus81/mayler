@@ -17,8 +17,6 @@ export const useWebRTC = () => {
         setAgentInterimTranscript,
         selectedVoice,
         voiceEngine,
-
-        rimeSpeakerId,
     } = useMayler();
 
     const { runTool, toolkitDefinitions } = useToolkit();
@@ -37,7 +35,7 @@ export const useWebRTC = () => {
     }, []);
 
     const configureSession = useCallback(() => {
-        const modalities = voiceEngine === 'openai' ? ['text', 'audio'] : ['text'];
+        const modalities = ['text', 'audio'];
 
         sendEvent({
             type: 'session.update',
@@ -240,22 +238,6 @@ Your goal is to be the ultimate helpful assistant.`,
                     if (text.trim()) {
                         setAgentTranscript(text);
                         setAgentInterimTranscript('');
-
-                        // Rime Playback
-                        if (voiceEngine === 'rime') {
-                            fetch('/api/tts/rime', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ text, speakerId: rimeSpeakerId })
-                            })
-                                .then(res => res.blob())
-                                .then(blob => {
-                                    const url = URL.createObjectURL(blob);
-                                    const audio = new Audio(url);
-                                    audio.play();
-                                })
-                                .catch(err => console.error('Rime playback failed:', err));
-                        }
                     }
                 }
 

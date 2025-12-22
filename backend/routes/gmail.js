@@ -2,22 +2,13 @@ import express from 'express';
 
 export const createGmailRouter = (gmailService) => {
     const router = express.Router();
-    let gmailAvailable = false;
-
-    // Initialize logic
-    gmailService.initialize().then(available => {
-        gmailAvailable = available;
-        if (available) console.log('Gmail service initialized');
-        else console.log('Gmail service not available (missing credentials or token)');
-    });
 
     // Helper to ensure auth
     const ensureAuth = async (req, res, next) => {
-        if (!gmailAvailable) {
+        if (!gmailService.gmail) {
             // Try to re-init
             const available = await gmailService.initialize();
-            if (available) {
-                gmailAvailable = true;
+            if (available && gmailService.gmail) {
                 return next();
             }
             return res.status(503).json({ error: 'Gmail not authenticated' });
@@ -27,16 +18,6 @@ export const createGmailRouter = (gmailService) => {
 
     router.get('/auth-url', async (req, res) => {
         try {
-            if (!gmailAvailable) {
-                const available = await gmailService.initialize();
-                if (!available) {
-                    // Start auth flow
-                    const authUrl = await gmailService.getAuthUrl();
-                    return res.json({ authUrl });
-                }
-                gmailAvailable = true;
-            }
-            // Already available, but user might want to re-auth?
             const authUrl = await gmailService.getAuthUrl();
             res.json({ authUrl });
         } catch (error) {
@@ -52,7 +33,6 @@ export const createGmailRouter = (gmailService) => {
             }
 
             await gmailService.setAuthCode(code);
-            gmailAvailable = true;
 
             res.send(`
                 <html>
@@ -87,7 +67,6 @@ export const createGmailRouter = (gmailService) => {
             const { code } = req.body;
             if (!code) return res.status(400).json({ error: 'Code required' });
             await gmailService.setAuthCode(code);
-            gmailAvailable = true;
             res.json({ success: true, message: 'Authenticated' });
         } catch (err) {
             res.status(500).json({ error: err.message });
@@ -99,6 +78,16 @@ export const createGmailRouter = (gmailService) => {
             const maxResults = parseInt(req.query.maxResults) || 10;
             const emails = await gmailService.getRecentEmails(maxResults);
             res.json({ emails });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/summarize', ensureAuth, async (req, res) => {
+        try {
+            const maxResults = parseInt(req.body.maxResults) || 10;
+            const result = await gmailService.summarizeEmails(maxResults);
+            res.json({ result });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -158,9 +147,11 @@ export const createGmailRouter = (gmailService) => {
     router.post('/mark-read', ensureAuth, async (req, res) => {
         try {
             const { emailId } = req.body;
-            const result = await gmailService.markEmailRead(emailId);
+            console.log('[Gmail Route] Marking email as read:', emailId);
+            const result = await gmailService.markAsRead(emailId);
             res.json({ success: true, result });
         } catch (error) {
+            console.error('[Gmail Route] Mark read failed:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -168,9 +159,11 @@ export const createGmailRouter = (gmailService) => {
     router.post('/mark-unread', ensureAuth, async (req, res) => {
         try {
             const { emailId } = req.body;
-            const result = await gmailService.markEmailUnread(emailId);
+            console.log('[Gmail Route] Marking email as unread:', emailId);
+            const result = await gmailService.markAsUnread(emailId);
             res.json({ success: true, result });
         } catch (error) {
+            console.error('[Gmail Route] Mark unread failed:', error);
             res.status(500).json({ error: error.message });
         }
     });
@@ -208,10 +201,14 @@ export const createGmailRouter = (gmailService) => {
     router.post('/summarize', ensureAuth, async (req, res) => {
         try {
             const { maxResults = 10 } = req.body;
+            console.log('[Gmail Route] Summarizing recent emails');
             const emails = await gmailService.getRecentEmails(maxResults);
+
+            // Note: summarizeEmails is implemented in GmailService
             const summary = await gmailService.summarizeEmails(emails);
             res.json({ summary, emails: emails.slice(0, 5) });
         } catch (error) {
+            console.error('[Gmail Route] Summarize failed:', error);
             res.status(500).json({ error: error.message });
         }
     });

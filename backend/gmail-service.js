@@ -32,6 +32,9 @@ class GmailService {
       // Prefer credentials from environment for cloud deployments
       let credentials = null;
       const credsFromEnv = process.env.GMAIL_CREDENTIALS_JSON;
+      const individualClientId = process.env.GMAIL_CLIENT_ID;
+      const individualClientSecret = process.env.GMAIL_CLIENT_SECRET;
+
       if (credsFromEnv) {
         try {
           credentials = JSON.parse(credsFromEnv);
@@ -39,47 +42,68 @@ class GmailService {
           console.error('Failed to parse GMAIL_CREDENTIALS_JSON env var:', e?.message);
           return false;
         }
+      } else if (individualClientId && individualClientSecret) {
+        // Construct credentials object from individual env vars
+        credentials = {
+          installed: {
+            client_id: individualClientId,
+            client_secret: individualClientSecret,
+            redirect_uris: [process.env.OAUTH_REDIRECT_URI || 'http://localhost:3000/api/gmail/auth-redirect']
+          }
+        };
       } else {
         // Fallback to credentials file on local/dev
         const credentialsExist = await fs.access(CREDENTIALS_PATH).then(() => true).catch(() => false);
         if (!credentialsExist) {
-          console.log('Gmail credentials not found. Provide GMAIL_CREDENTIALS_JSON env var or add backend/gmail-credentials.json.');
+          console.log('Gmail credentials not found. Provide GMAIL_CREDENTIALS_JSON, GMAIL_CLIENT_ID/SECRET, or add backend/gmail-credentials.json.');
           return false;
         }
         credentials = JSON.parse(await fs.readFile(CREDENTIALS_PATH, 'utf8'));
       }
-      const { client_secret, client_id } = credentials.installed || credentials.web;
+
+      const config = credentials.installed || credentials.web;
+      if (!config) {
+        console.error('Invalid Gmail credentials format');
+        return false;
+      }
+      const { client_secret, client_id } = config;
 
       // Use our auth redirect endpoint - prefer env var for flexibility
       const redirectUri = process.env.OAUTH_REDIRECT_URI ||
+        (config.redirect_uris && config.redirect_uris[0]) ||
         (process.env.NODE_ENV === 'production'
           ? 'https://tisang-production.up.railway.app/api/gmail/auth-redirect'
           : 'http://localhost:3000/api/gmail/auth-redirect');
 
       this.auth = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
-      // Check if we have a stored token (prefer env var for cloud)
+      // Check if we have a stored token
+      let hasToken = false;
       const tokenFromEnv = process.env.GMAIL_TOKEN_JSON;
       if (tokenFromEnv) {
         try {
           this.auth.setCredentials(JSON.parse(tokenFromEnv));
+          hasToken = true;
         } catch (e) {
           console.error('Failed to parse GMAIL_TOKEN_JSON env var:', e?.message);
-          return false;
         }
       } else {
         try {
           const token = await fs.readFile(TOKEN_PATH, 'utf8');
           this.auth.setCredentials(JSON.parse(token));
+          hasToken = true;
         } catch (err) {
           console.log('No stored Gmail token found. Gmail features will require authentication.');
         }
       }
 
-      this.gmail = google.gmail({ version: 'v1', auth: this.auth });
-      this.calendar = google.calendar({ version: 'v3', auth: this.auth });
+      if (hasToken) {
+        this.gmail = google.gmail({ version: 'v1', auth: this.auth });
+        this.calendar = google.calendar({ version: 'v3', auth: this.auth });
+        return true;
+      }
 
-      return true;
+      return false; // Initialize successful (auth object created) but not authenticated yet
     } catch (error) {
       console.error('Failed to initialize Gmail service:', error);
       return false;
@@ -146,6 +170,34 @@ class GmailService {
     } catch (error) {
       console.error('Failed to get emails:', error?.message || error);
       throw new Error(`Failed to retrieve emails: ${error?.message || 'Unknown error'}`);
+    }
+  }
+
+  async summarizeEmails(maxResults = 10) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+    try {
+      const resp = await this.gmail.users.messages.list({
+        userId: 'me',
+        maxResults,
+        q: 'in:inbox'
+      });
+
+      if (!resp.data.messages) return "No recent emails found in your inbox.";
+
+      const summaries = [];
+      for (const msg of resp.data.messages) {
+        const email = await this.gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id,
+          format: 'minimal'
+        });
+        summaries.push(`- ${email.data.snippet}`);
+      }
+
+      return summaries.join('\n');
+    } catch (error) {
+      console.error('Failed to summarize emails:', error);
+      throw new Error('Failed to summarize emails');
     }
   }
 
@@ -819,6 +871,24 @@ ${originalEmail.body}
       console.error('Failed to bulk mark as read:', error);
       throw new Error('Failed to bulk mark as read');
     }
+  }
+
+  async summarizeEmails(emails) {
+    if (!emails || emails.length === 0) return "You have no recent emails to summarize.";
+
+    let summary = `You have ${emails.length} recent emails:\n\n`;
+
+    for (const email of emails.slice(0, 5)) {
+      summary += `- From: ${email.from}\n`;
+      summary += `  Subject: ${email.subject}\n`;
+      summary += `  Snippet: ${email.snippet}\n\n`;
+    }
+
+    if (emails.length > 5) {
+      summary += `...and ${emails.length - 5} more.`;
+    }
+
+    return summary;
   }
 
   // ==================== ATTACHMENT OPERATIONS ====================

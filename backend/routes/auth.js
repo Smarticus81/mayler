@@ -57,7 +57,6 @@ export const createAuthRouter = () => {
                     user_id: data.user.id,
                     voice_engine: 'openai',
                     selected_voice: 'alloy',
-                    rime_speaker_id: 'marsh',
                     wake_word_enabled: true
                 });
 

@@ -26,10 +26,12 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Initialize services
-// Note: gmailService initialization happens lazily/asynchronously in the router or via explicit call
 const gmailService = new GmailService();
 const utilityService = new UtilityService();
 const searchService = new SearchService();
+
+// Pre-initialize Gmail if token exists
+gmailService.initialize().catch(err => console.error('Initial Gmail check failed:', err));
 
 console.log('Services loaded');
 
@@ -40,7 +42,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const tokenRouter = createTokenRouter();
 const gmailRouter = createGmailRouter(gmailService);
 const calendarRouter = createCalendarRouter(gmailService);
-const utilityRouter = createUtilityRouter(utilityService);
+const utilityRouter = createUtilityRouter(utilityService, gmailService);
 const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
 const authRouter = createAuthRouter();

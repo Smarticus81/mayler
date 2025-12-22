@@ -1,71 +1,22 @@
 import express from 'express';
 import fetch from 'node-fetch';
 
-export const createUtilityRouter = (utilityService) => {
+export const createUtilityRouter = (utilityService, gmailService) => {
     const router = express.Router();
 
-    router.post('/tts/rime', async (req, res) => {
-        const { text, speakerId } = req.body;
-        const apiKey = process.env.RIME_API_KEY;
-
-        if (!apiKey) {
-            return res.status(400).json({ error: 'RIME_API_KEY not configured' });
-        }
-
+    router.get('/status', async (req, res) => {
         try {
-            const modelId = req.body.modelId || 'mist-v2';
-            const requestBody = {
-                text,
-                speaker: speakerId || 'marsh',
-                modelId: modelId
-            };
-
-            // Add Arcana-specific parameters if using arcana model
-            if (modelId === 'arcana') {
-                requestBody.samplingRate = 24000;
-                requestBody.temperature = 0.5;
-                requestBody.repetition_penalty = 1.5;
-                requestBody.top_p = 1;
-                requestBody.max_tokens = 1200;
-            }
-
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            };
-
-            // Add Accept header for Arcana
-            if (modelId === 'arcana') {
-                headers['Accept'] = 'audio/mp3';
-            }
-
-            const response = await fetch('https://users.rime.ai/v1/rime-tts', {
-                method: 'POST',
-                headers: headers,
-                body: JSON.stringify(requestBody)
+            const gmailAvailable = !!(gmailService && gmailService.gmail);
+            res.json({
+                gmail: gmailAvailable,
+                weather: !!process.env.OPENWEATHER_API_KEY,
+                search: !!process.env.SERPER_API_KEY
             });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Rime API Error Status:', response.status);
-                console.error('Rime API Error Body:', errorText);
-                throw new Error(`Rime API error: ${response.status} - ${errorText}`);
-            }
-
-            const { audioContent } = await response.json();
-            if (!audioContent) throw new Error('No audio content returned from Rime');
-
-            const audioBuffer = Buffer.from(audioContent, 'base64');
-            res.set({
-                'Content-Type': 'audio/wav',
-                'Content-Length': audioBuffer.length
-            });
-            res.send(audioBuffer);
-        } catch (err) {
-            console.error('Rime TTS failed:', err);
-            res.status(500).json({ error: err.message });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     });
+
 
     router.post('/weather', async (req, res) => {
         try {
