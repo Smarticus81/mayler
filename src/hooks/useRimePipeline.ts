@@ -174,11 +174,17 @@ Your goal is to be the ultimate helpful assistant.`
             return;
         }
 
+        // Prevent multiple connections
+        if (connected) {
+            console.log('[Rime Pipeline] Already connected, ignoring duplicate connection request');
+            return;
+        }
+
         console.log('[Rime Pipeline] Connecting...');
         startListening(handleTranscript);
         setConnected(true);
         setListening(true);
-    }, [startListening, handleTranscript, isSupported, setError, setListening]);
+    }, [startListening, handleTranscript, isSupported, setError, setListening, connected]);
 
     const disconnect = useCallback(() => {
         console.log('[Rime Pipeline] Disconnecting...');

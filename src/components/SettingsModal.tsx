@@ -66,24 +66,16 @@ export const SettingsModal: React.FC = () => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-                                <label style={{ fontSize: '12px', opacity: 0.7 }}>Rime Speaker ID</label>
-                                <input
-                                    type="text"
-                                    value={rimeSpeakerId}
-                                    onChange={(e) => setRimeSpeakerId(e.target.value)}
-                                    placeholder="Enter Speaker ID"
-                                    className="settings-input"
-                                    style={{
-                                        background: 'var(--glass-bg)',
-                                        border: '1px solid var(--glass-border)',
-                                        borderRadius: '8px',
-                                        padding: '8px 12px',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '14px'
-                                    }}
-                                />
-                                <span style={{ fontSize: '11px', opacity: 0.5 }}>Try IDs: marsh, amber, george, kevin, kyna</span>
+                            <div className="voice-grid">
+                                {['marsh', 'amber', 'george', 'kevin', 'kyna', 'deedee', 'nova', 'phoenix', 'sage', 'storm'].map((speaker) => (
+                                    <button
+                                        key={speaker}
+                                        className={`voice-btn ${rimeSpeakerId === speaker ? 'active' : ''}`}
+                                        onClick={() => setRimeSpeakerId(speaker)}
+                                    >
+                                        {speaker.charAt(0).toUpperCase() + speaker.slice(1)}
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
