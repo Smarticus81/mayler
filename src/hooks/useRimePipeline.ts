@@ -8,12 +8,18 @@ interface Message {
     content: string;
 }
 
+interface AudioQueueItem {
+    audio: HTMLAudioElement;
+    url: string;
+}
+
 export const useRimePipeline = () => {
     const { rimeSpeakerId, rimeModelId, setError, setSpeaking, setListening, setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript } = useMayler();
     const { runTool, toolkitDefinitions } = useToolkit();
     const { startListening, stopListening, isListening: speechIsListening, interimTranscript: speechInterim, isSupported } = useRimeSpeechRecognition();
 
     const [connected, setConnected] = useState(false);
+    const [audioLevel, setAudioLevel] = useState(0);
     const conversationRef = useRef<Message[]>([
         {
             role: 'system',
@@ -34,24 +40,41 @@ CORE BEHAVIOR RULES:
 Your goal is to be the ultimate helpful assistant.`
         }
     ]);
-    const audioQueueRef = useRef<HTMLAudioElement[]>([]);
+    const audioQueueRef = useRef<AudioQueueItem[]>([]);
     const isPlayingRef = useRef(false);
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const animationFrameRef = useRef<number | null>(null);
+
+    // Initialize audio context for level analysis
+    const initAudioContext = useCallback(() => {
+        if (!audioContextRef.current) {
+            const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+            audioContextRef.current = new AudioContextClass();
+        }
+        return audioContextRef.current;
+    }, []);
 
     const playNextAudio = useCallback(() => {
         if (isPlayingRef.current || audioQueueRef.current.length === 0) {
             return;
         }
 
-        const audio = audioQueueRef.current.shift();
-        if (!audio) return;
+        const item = audioQueueRef.current.shift();
+        if (!item) return;
 
+        const { audio, url } = item;
         isPlayingRef.current = true;
         setSpeaking(true);
 
         audio.onended = () => {
             isPlayingRef.current = false;
             setSpeaking(false);
-            URL.revokeObjectURL(audio.src);
+            setAudioLevel(0);
+            URL.revokeObjectURL(url);
+
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
 
             // Play next in queue
             if (audioQueueRef.current.length > 0) {
@@ -60,9 +83,11 @@ Your goal is to be the ultimate helpful assistant.`
         };
 
         audio.onerror = (e) => {
-            console.error('Audio playback error:', e);
+            console.error('[Rime] Audio playback error:', e);
             isPlayingRef.current = false;
             setSpeaking(false);
+            setAudioLevel(0);
+            URL.revokeObjectURL(url);
 
             // Try next in queue
             if (audioQueueRef.current.length > 0) {
@@ -70,16 +95,51 @@ Your goal is to be the ultimate helpful assistant.`
             }
         };
 
-        audio.play().catch(err => {
-            console.error('Failed to play audio:', err);
+        audio.play().then(() => {
+            // Start audio analysis after playback begins
+            // Note: We can't use createMediaElementSource on the same element twice
+            // So we'll simulate audio level based on playback
+            const simulateLevel = () => {
+                if (!isPlayingRef.current) {
+                    setAudioLevel(0);
+                    return;
+                }
+                // Simulate varying audio levels
+                const level = 0.3 + Math.random() * 0.4;
+                setAudioLevel(level);
+                animationFrameRef.current = requestAnimationFrame(simulateLevel);
+            };
+            simulateLevel();
+        }).catch(err => {
+            console.error('[Rime] Failed to play audio:', err);
             isPlayingRef.current = false;
             setSpeaking(false);
         });
     }, [setSpeaking]);
 
+    // Interrupt current playback
+    const interruptPlayback = useCallback(() => {
+        // Stop current audio
+        audioQueueRef.current.forEach(item => {
+            item.audio.pause();
+            URL.revokeObjectURL(item.url);
+        });
+        audioQueueRef.current = [];
+        isPlayingRef.current = false;
+        setSpeaking(false);
+        setAudioLevel(0);
+
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+        }
+    }, [setSpeaking]);
+
     const handleTranscript = useCallback(async (text: string) => {
         console.log('[Rime Pipeline] User said:', text);
         setTranscript(text);
+
+        // Interrupt any ongoing playback when user speaks
+        interruptPlayback();
 
         // Add to conversation history
         conversationRef.current.push({ role: 'user', content: text });
@@ -118,6 +178,8 @@ Your goal is to be the ultimate helpful assistant.`
                 console.log('[Rime Pipeline] Executing tools:', data.tool_calls);
 
                 for (const call of data.tool_calls) {
+                    setAgentInterimTranscript(`Running ${call.function.name}...`);
+                    
                     const toolResult = await runTool(
                         call.function.name,
                         JSON.parse(call.function.arguments)
@@ -150,28 +212,34 @@ Your goal is to be the ultimate helpful assistant.`
             setAgentInterimTranscript('');
 
             console.log('[Rime Pipeline] Assistant response:', assistantMessage);
+            console.log('[Rime Pipeline] Using speaker:', rimeSpeakerId, 'model:', rimeModelId);
 
-            // Send to Rime TTS
+            // Send to Rime TTS with optimized settings
             const ttsResponse = await fetch('/api/tts/rime', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     text: assistantMessage,
                     speakerId: rimeSpeakerId,
-                    modelId: rimeModelId
+                    modelId: rimeModelId,
+                    reduceLatency: true
                 }),
             });
 
             if (!ttsResponse.ok) {
-                throw new Error(`Rime TTS error: ${ttsResponse.status}`);
+                const errorData = await ttsResponse.json().catch(() => ({}));
+                throw new Error(errorData.error || `Rime TTS error: ${ttsResponse.status}`);
             }
 
             const audioBlob = await ttsResponse.blob();
             const audioUrl = URL.createObjectURL(audioBlob);
             const audio = new Audio(audioUrl);
+            
+            // Preload audio for faster playback
+            audio.preload = 'auto';
 
             // Add to queue and play
-            audioQueueRef.current.push(audio);
+            audioQueueRef.current.push({ audio, url: audioUrl });
             playNextAudio();
 
         } catch (error: any) {
@@ -180,7 +248,7 @@ Your goal is to be the ultimate helpful assistant.`
             setAgentInterimTranscript('');
             setSpeaking(false);
         }
-    }, [rimeSpeakerId, runTool, toolkitDefinitions, setTranscript, setAgentTranscript, setAgentInterimTranscript, setError, setSpeaking, playNextAudio]);
+    }, [rimeSpeakerId, rimeModelId, runTool, toolkitDefinitions, setTranscript, setAgentTranscript, setAgentInterimTranscript, setError, setSpeaking, playNextAudio, interruptPlayback]);
 
     const connect = useCallback(() => {
         if (!isSupported) {
@@ -194,27 +262,57 @@ Your goal is to be the ultimate helpful assistant.`
             return;
         }
 
-        console.log('[Rime Pipeline] Connecting...');
+        console.log('[Rime Pipeline] Connecting with Rime TTS...');
+        console.log('[Rime Pipeline] Speaker:', rimeSpeakerId, 'Model:', rimeModelId);
+        
+        // Initialize audio context on connect (requires user gesture)
+        initAudioContext();
+        
         startListening(handleTranscript);
         setConnected(true);
         setListening(true);
-    }, [startListening, handleTranscript, isSupported, setError, setListening, connected]);
+    }, [startListening, handleTranscript, isSupported, setError, setListening, connected, rimeSpeakerId, rimeModelId, initAudioContext]);
 
     const disconnect = useCallback(() => {
         console.log('[Rime Pipeline] Disconnecting...');
         stopListening();
+        
+        // Clear audio queue
+        audioQueueRef.current.forEach(item => {
+            item.audio.pause();
+            URL.revokeObjectURL(item.url);
+        });
+        audioQueueRef.current = [];
+        isPlayingRef.current = false;
+        
+        // Cancel animation frame
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+        }
+        
         setConnected(false);
         setListening(false);
         setSpeaking(false);
+        setAudioLevel(0);
         conversationRef.current = conversationRef.current.slice(0, 1); // Keep system message only
-        audioQueueRef.current = [];
-        isPlayingRef.current = false;
     }, [stopListening, setListening, setSpeaking]);
 
     // Update interim transcript from speech recognition
     useEffect(() => {
         setInterimTranscript(speechInterim);
     }, [speechInterim, setInterimTranscript]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
+            audioQueueRef.current.forEach(item => {
+                URL.revokeObjectURL(item.url);
+            });
+        };
+    }, []);
 
     return {
         connect,
@@ -223,6 +321,6 @@ Your goal is to be the ultimate helpful assistant.`
         isListening: speechIsListening,
         isSupported,
         remoteAudioElRef: { current: null }, // Dummy ref for compatibility
-        audioLevel: 0, // No audio level for Rime pipeline
+        audioLevel,
     };
 };

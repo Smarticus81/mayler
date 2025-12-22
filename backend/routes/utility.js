@@ -1,43 +1,92 @@
 import express from 'express';
 import fetch from 'node-fetch';
 
+// Rime speaker definitions with metadata
+const RIME_SPEAKERS = {
+    // Mist v2 Speakers - Fast, low latency
+    'mist': {
+        'marsh': { name: 'Marsh', gender: 'male', style: 'calm' },
+        'lagoon': { name: 'Lagoon', gender: 'female', style: 'warm' },
+        'cove': { name: 'Cove', gender: 'male', style: 'conversational' },
+        'bay': { name: 'Bay', gender: 'female', style: 'professional' },
+        'creek': { name: 'Creek', gender: 'male', style: 'friendly' },
+        'brook': { name: 'Brook', gender: 'female', style: 'gentle' },
+        'grove': { name: 'Grove', gender: 'male', style: 'deep' },
+        'mesa': { name: 'Mesa', gender: 'female', style: 'energetic' },
+        'vale': { name: 'Vale', gender: 'male', style: 'neutral' },
+        'moon': { name: 'Moon', gender: 'female', style: 'soothing' },
+    },
+    // Arcana Speakers - Higher quality
+    'arcana': {
+        'cove': { name: 'Cove', gender: 'male', style: 'conversational' },
+        'luna': { name: 'Luna', gender: 'female', style: 'expressive' },
+        'ember': { name: 'Ember', gender: 'female', style: 'warm' },
+        'orion': { name: 'Orion', gender: 'male', style: 'authoritative' },
+        'nova': { name: 'Nova', gender: 'female', style: 'dynamic' },
+        'atlas': { name: 'Atlas', gender: 'male', style: 'steady' },
+        'iris': { name: 'Iris', gender: 'female', style: 'friendly' },
+        'zephyr': { name: 'Zephyr', gender: 'male', style: 'calm' },
+    }
+};
+
 export const createUtilityRouter = (utilityService) => {
     const router = express.Router();
 
+    // Get available Rime speakers
+    router.get('/tts/rime/speakers', (req, res) => {
+        res.json(RIME_SPEAKERS);
+    });
+
+    // Rime TTS endpoint with streaming support
     router.post('/tts/rime', async (req, res) => {
-        const { text, speakerId } = req.body;
+        const { text, speakerId, modelId: requestedModel, speed, reduceLatency } = req.body;
         const apiKey = process.env.RIME_API_KEY;
 
         if (!apiKey) {
             return res.status(400).json({ error: 'RIME_API_KEY not configured' });
         }
 
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
         try {
-            const modelId = req.body.modelId || 'mist-v2';
+            const modelId = requestedModel || 'mist';
+            const speaker = speakerId || 'cove';
+            
+            console.log(`[Rime TTS] Model: ${modelId}, Speaker: ${speaker}, Text length: ${text.length}`);
+
             const requestBody = {
-                text,
-                speaker: speakerId || 'marsh',
-                modelId: modelId
+                text: text.trim(),
+                speaker: speaker,
+                modelId: modelId,
             };
 
-            // Add Arcana-specific parameters if using arcana model
+            // Speed/rate control (0.5 to 2.0)
+            if (speed && speed >= 0.5 && speed <= 2.0) {
+                requestBody.speedAlpha = speed;
+            }
+
+            // Reduce latency option for streaming scenarios
+            if (reduceLatency) {
+                requestBody.reduceLatency = true;
+            }
+
+            // Model-specific parameters
             if (modelId === 'arcana') {
-                requestBody.samplingRate = 24000;
-                requestBody.temperature = 0.5;
-                requestBody.repetition_penalty = 1.5;
-                requestBody.top_p = 1;
-                requestBody.max_tokens = 1200;
+                requestBody.samplingRate = 22050;
+                requestBody.audioFormat = 'mp3';
+            } else {
+                // mist model defaults
+                requestBody.samplingRate = 22050;
+                requestBody.audioFormat = 'mp3';
             }
 
             const headers = {
                 'Authorization': `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
             };
-
-            // Add Accept header for Arcana
-            if (modelId === 'arcana') {
-                headers['Accept'] = 'audio/mp3';
-            }
 
             const response = await fetch('https://users.rime.ai/v1/rime-tts', {
                 method: 'POST',
@@ -47,23 +96,110 @@ export const createUtilityRouter = (utilityService) => {
 
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Rime API Error Status:', response.status);
-                console.error('Rime API Error Body:', errorText);
+                console.error('[Rime TTS] API Error Status:', response.status);
+                console.error('[Rime TTS] API Error Body:', errorText);
                 throw new Error(`Rime API error: ${response.status} - ${errorText}`);
             }
 
-            const { audioContent } = await response.json();
-            if (!audioContent) throw new Error('No audio content returned from Rime');
+            const data = await response.json();
+            const { audioContent } = data;
+            
+            if (!audioContent) {
+                throw new Error('No audio content returned from Rime');
+            }
 
             const audioBuffer = Buffer.from(audioContent, 'base64');
+            
+            // Determine content type based on format
+            const contentType = requestBody.audioFormat === 'mp3' ? 'audio/mpeg' : 'audio/wav';
+            
             res.set({
-                'Content-Type': 'audio/wav',
-                'Content-Length': audioBuffer.length
+                'Content-Type': contentType,
+                'Content-Length': audioBuffer.length,
+                'Cache-Control': 'no-cache',
+                'X-Rime-Model': modelId,
+                'X-Rime-Speaker': speaker
             });
+            
             res.send(audioBuffer);
+            
+            console.log(`[Rime TTS] Success: ${audioBuffer.length} bytes`);
         } catch (err) {
-            console.error('Rime TTS failed:', err);
+            console.error('[Rime TTS] Failed:', err.message);
             res.status(500).json({ error: err.message });
+        }
+    });
+
+    // Streaming TTS endpoint for ultra-low latency
+    router.post('/tts/rime/stream', async (req, res) => {
+        const { text, speakerId, modelId: requestedModel } = req.body;
+        const apiKey = process.env.RIME_API_KEY;
+
+        if (!apiKey) {
+            return res.status(400).json({ error: 'RIME_API_KEY not configured' });
+        }
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: 'Text is required' });
+        }
+
+        try {
+            const modelId = requestedModel || 'mist';
+            const speaker = speakerId || 'cove';
+
+            // Split text into sentences for streaming playback
+            const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
+            
+            res.set({
+                'Content-Type': 'audio/mpeg',
+                'Transfer-Encoding': 'chunked',
+                'Cache-Control': 'no-cache',
+                'X-Rime-Model': modelId,
+                'X-Rime-Speaker': speaker
+            });
+
+            for (const sentence of sentences) {
+                if (sentence.trim().length === 0) continue;
+
+                const requestBody = {
+                    text: sentence.trim(),
+                    speaker: speaker,
+                    modelId: modelId,
+                    samplingRate: 22050,
+                    audioFormat: 'mp3',
+                    reduceLatency: true
+                };
+
+                const response = await fetch('https://users.rime.ai/v1/rime-tts', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (!response.ok) {
+                    console.error('[Rime Stream] Chunk failed:', response.status);
+                    continue;
+                }
+
+                const data = await response.json();
+                if (data.audioContent) {
+                    const audioBuffer = Buffer.from(data.audioContent, 'base64');
+                    res.write(audioBuffer);
+                }
+            }
+
+            res.end();
+        } catch (err) {
+            console.error('[Rime Stream] Failed:', err.message);
+            if (!res.headersSent) {
+                res.status(500).json({ error: err.message });
+            } else {
+                res.end();
+            }
         }
     });
 

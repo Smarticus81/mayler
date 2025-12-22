@@ -2,6 +2,31 @@ import React from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAuth } from '../hooks/useAuth';
 
+// Rime speaker definitions
+const RIME_MIST_SPEAKERS = [
+    { id: 'cove', name: 'Cove', gender: 'M', style: 'Conversational' },
+    { id: 'marsh', name: 'Marsh', gender: 'M', style: 'Calm' },
+    { id: 'lagoon', name: 'Lagoon', gender: 'F', style: 'Warm' },
+    { id: 'bay', name: 'Bay', gender: 'F', style: 'Professional' },
+    { id: 'creek', name: 'Creek', gender: 'M', style: 'Friendly' },
+    { id: 'brook', name: 'Brook', gender: 'F', style: 'Gentle' },
+    { id: 'grove', name: 'Grove', gender: 'M', style: 'Deep' },
+    { id: 'mesa', name: 'Mesa', gender: 'F', style: 'Energetic' },
+    { id: 'vale', name: 'Vale', gender: 'M', style: 'Neutral' },
+    { id: 'moon', name: 'Moon', gender: 'F', style: 'Soothing' },
+];
+
+const RIME_ARCANA_SPEAKERS = [
+    { id: 'cove', name: 'Cove', gender: 'M', style: 'Conversational' },
+    { id: 'luna', name: 'Luna', gender: 'F', style: 'Expressive' },
+    { id: 'ember', name: 'Ember', gender: 'F', style: 'Warm' },
+    { id: 'orion', name: 'Orion', gender: 'M', style: 'Authoritative' },
+    { id: 'nova', name: 'Nova', gender: 'F', style: 'Dynamic' },
+    { id: 'atlas', name: 'Atlas', gender: 'M', style: 'Steady' },
+    { id: 'iris', name: 'Iris', gender: 'F', style: 'Friendly' },
+    { id: 'zephyr', name: 'Zephyr', gender: 'M', style: 'Calm' },
+];
+
 export const SettingsModal: React.FC = () => {
     const {
         showSettings, setShowSettings,
@@ -9,7 +34,6 @@ export const SettingsModal: React.FC = () => {
         googleStatus,
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
-
         rimeSpeakerId, setRimeSpeakerId,
         rimeModelId, setRimeModelId
     } = useMayler();
@@ -20,6 +44,8 @@ export const SettingsModal: React.FC = () => {
 
     const voices: Array<'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'> =
         ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
+
+    const rimeSpeakers = rimeModelId === 'arcana' ? RIME_ARCANA_SPEAKERS : RIME_MIST_SPEAKERS;
 
     return (
         <div className="settings-panel" onClick={() => setShowSettings(false)}>
@@ -36,23 +62,53 @@ export const SettingsModal: React.FC = () => {
                                 className={`voice-btn ${voiceEngine === 'openai' ? 'active' : ''}`}
                                 onClick={() => setVoiceEngine('openai')}
                             >
-                                OpenAI (Fast)
+                                OpenAI Realtime
                             </button>
 
                             <button
                                 className={`voice-btn ${voiceEngine === 'rime' ? 'active' : ''}`}
                                 onClick={() => setVoiceEngine('rime')}
                             >
-                                Rime (Instant)
+                                Rime TTS
                             </button>
                         </div>
                     </div>
 
+                    {voiceEngine === 'rime' && (
+                        <div className="setting-section">
+                            <h3>Rime Model</h3>
+                            <div className="voice-grid">
+                                <button
+                                    className={`voice-btn ${rimeModelId === 'mist' ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setRimeModelId('mist');
+                                        // Reset speaker if not available in new model
+                                        if (!RIME_MIST_SPEAKERS.find(s => s.id === rimeSpeakerId)) {
+                                            setRimeSpeakerId('cove');
+                                        }
+                                    }}
+                                >
+                                    Mist (Fast)
+                                </button>
+                                <button
+                                    className={`voice-btn ${rimeModelId === 'arcana' ? 'active' : ''}`}
+                                    onClick={() => {
+                                        setRimeModelId('arcana');
+                                        // Reset speaker if not available in new model
+                                        if (!RIME_ARCANA_SPEAKERS.find(s => s.id === rimeSpeakerId)) {
+                                            setRimeSpeakerId('cove');
+                                        }
+                                    }}
+                                >
+                                    Arcana (Quality)
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="setting-section">
                         <h3>
-                            {voiceEngine === 'openai' ? 'OpenAI Voice' :
-                                voiceEngine === 'rime' ? 'Rime Speaker' : 'Unknown'}
-
+                            {voiceEngine === 'openai' ? 'OpenAI Voice' : 'Rime Speaker'}
                         </h3>
                         {voiceEngine === 'openai' ? (
                             <div className="voice-grid">
@@ -67,35 +123,18 @@ export const SettingsModal: React.FC = () => {
                                 ))}
                             </div>
                         ) : (
-                            <div className="voice-grid">
-                                {['marsh', 'lagoon', 'moon', 'sky', 'amber'].map((speaker) => (
+                            <div className="voice-grid rime-speakers">
+                                {rimeSpeakers.map((speaker) => (
                                     <button
-                                        key={speaker}
-                                        className={`voice-btn ${rimeSpeakerId === speaker ? 'active' : ''}`}
-                                        onClick={() => setRimeSpeakerId(speaker)}
+                                        key={speaker.id}
+                                        className={`voice-btn ${rimeSpeakerId === speaker.id ? 'active' : ''}`}
+                                        onClick={() => setRimeSpeakerId(speaker.id)}
+                                        title={`${speaker.style} - ${speaker.gender === 'M' ? 'Male' : 'Female'}`}
                                     >
-                                        {speaker.charAt(0).toUpperCase() + speaker.slice(1)}
+                                        <span className="speaker-name">{speaker.name}</span>
+                                        <span className="speaker-meta">{speaker.gender} / {speaker.style}</span>
                                     </button>
                                 ))}
-                            </div>
-                        )}
-                        {voiceEngine === 'rime' && (
-                            <div style={{ marginTop: '15px' }}>
-                                <h4>Model</h4>
-                                <div className="voice-grid">
-                                    <button
-                                        className={`voice-btn ${rimeModelId === 'mist-v2' ? 'active' : ''}`}
-                                        onClick={() => setRimeModelId('mist-v2')}
-                                    >
-                                        Mist v2 (Fast)
-                                    </button>
-                                    <button
-                                        className={`voice-btn ${rimeModelId === 'arcana' ? 'active' : ''}`}
-                                        onClick={() => setRimeModelId('arcana')}
-                                    >
-                                        Arcana (Quality)
-                                    </button>
-                                </div>
                             </div>
                         )}
                     </div>

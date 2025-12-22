@@ -78,10 +78,10 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     });
 
     const [rimeSpeakerId, setRimeSpeakerId] = useState<string>(() => {
-        return localStorage.getItem('mayler_rime_speaker') || 'marsh';
+        return localStorage.getItem('mayler_rime_speaker') || 'cove';
     });
     const [rimeModelId, setRimeModelId] = useState<string>(() => {
-        return localStorage.getItem('mayler_rime_model') || 'mist-v2';
+        return localStorage.getItem('mayler_rime_model') || 'mist';
     });
     const [showSettings, setShowSettings] = useState(false);
 

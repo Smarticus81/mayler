@@ -911,3 +911,69 @@ body {
       box-shadow: 0 0 15px rgba(168, 181, 160, 0.1);
     }
   }
+}
+
+/* Rime Speaker Grid Styles */
+.voice-grid.rime-speakers {
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.voice-grid.rime-speakers .voice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 12px;
+  gap: 4px;
+}
+
+.voice-grid.rime-speakers .speaker-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
+}
+
+.voice-grid.rime-speakers .speaker-meta {
+  font-size: 10px;
+  font-weight: 300;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
+.voice-grid.rime-speakers .voice-btn.active .speaker-meta {
+  color: var(--primary);
+  opacity: 1;
+}
+
+/* Status Hint */
+.status-hint {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  animation: fadeIn 0.5s var(--ease-smooth);
+}
+
+/* Error Banner */
+.error-banner {
+  background: rgba(216, 168, 168, 0.15);
+  color: var(--error);
+  padding: 12px 20px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 400;
+  text-align: center;
+  max-width: 400px;
+  animation: fadeIn 0.3s var(--ease-smooth);
+}
+
+/* Controls */
+.controls {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
