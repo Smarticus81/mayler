@@ -67,7 +67,7 @@ export const SettingsModal: React.FC = () => {
                             </div>
                         ) : (
                             <div className="voice-grid">
-                                {['marsh', 'amber', 'george', 'kevin', 'kyna', 'deedee', 'nova', 'phoenix', 'sage', 'storm'].map((speaker) => (
+                                {['marsh', 'lagoon', 'moon', 'sky', 'amber'].map((speaker) => (
                                     <button
                                         key={speaker}
                                         className={`voice-btn ${rimeSpeakerId === speaker ? 'active' : ''}`}
