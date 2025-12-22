@@ -121,6 +121,7 @@ export const useRimeSpeechRecognition = () => {
     }, []);
 
     const stopListening = useCallback(() => {
+        console.log('[Rime Speech] stopListening called');
         shouldRestartRef.current = false;
         if (recognitionRef.current) {
             try {

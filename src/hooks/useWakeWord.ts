@@ -32,6 +32,8 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
     const startWakeRecognition = useCallback(() => {
         if (wakeRunningRef.current) return;
 
+        console.log('[Wake Word] Starting recognition...');
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) return;
 

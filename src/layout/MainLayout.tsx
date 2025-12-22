@@ -41,7 +41,7 @@ export const MainLayout: React.FC = () => {
 
                 setTimeout(() => {
                     connect(); /* Connect to Rime */
-                }, 800); // Increased delay to be safe
+                }, 1000); // 1s safe delay
             } else {
                 connect();
             }
