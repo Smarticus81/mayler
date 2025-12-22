@@ -32,11 +32,31 @@ export const MainLayout: React.FC = () => {
     useWakeWord(
         () => {
             if (!isActive) return;
-            console.log('Wake word detected! Connecting...');
-            connect(true);
+
+            const handleWakeWordDetected = () => {
+                console.log('Wake word detected! Connecting...');
+
+                // For Rime pipeline, we need to stop wake word first, then start Rime
+                if (voiceEngine === 'rime') {
+                    // Stop wake word recognition immediately
+                    if (wakeWordRef.current?.stopWakeRecognition) {
+                        wakeWordRef.current.stopWakeRecognition();
+                    }
+
+                    // Wait a bit for wake word to fully stop, then start Rime
+                    setTimeout(() => {
+                        connect();
+                    }, 300);
+                } else {
+                    // For OpenAI, connect immediately
+                    connect();
+                }
+            };
+            handleWakeWordDetected();
         },
         playWakeChime,
-        isActive
+        isActive,
+        wakeWordRef // Pass the ref to useWakeWord so it can expose its internal instance
     );
 
     return (

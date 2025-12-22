@@ -54,10 +54,6 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
                         lastWakeTimeRef.current = now;
                         onChime();
                         onWake();
-                        // Delay stopping to allow Rime pipeline to start
-                        setTimeout(() => {
-                            stopWakeRecognition();
-                        }, 500);
                     } else {
                         console.log('[Wake Word] Debounced - too soon after last trigger');
                     }
