@@ -26,14 +26,22 @@ export const createUtilityRouter = (utilityService) => {
                 requestBody.temperature = 0.5;
                 requestBody.repetition_penalty = 1.5;
                 requestBody.top_p = 1;
+                requestBody.max_tokens = 1200;
+            }
+
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            };
+
+            // Add Accept header for Arcana
+            if (modelId === 'arcana') {
+                headers['Accept'] = 'audio/mp3';
             }
 
             const response = await fetch('https://users.rime.ai/v1/rime-tts', {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
                 body: JSON.stringify(requestBody)
             });
 
