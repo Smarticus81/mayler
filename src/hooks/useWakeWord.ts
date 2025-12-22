@@ -29,8 +29,15 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
         wakeRunningRef.current = false;
     }, []);
 
+    const isActiveRef = useRef(isActive);
+
+    useEffect(() => {
+        isActiveRef.current = isActive;
+    }, [isActive]);
+
     const startWakeRecognition = useCallback(() => {
-        if (wakeRunningRef.current) return;
+        // Double check active status via ref to avoid stale closures
+        if (wakeRunningRef.current || !isActiveRef.current) return;
 
         console.log('[Wake Word] Starting recognition...');
 
@@ -65,7 +72,8 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
 
         recognition.onend = () => {
             wakeRunningRef.current = false;
-            if (wakeWordEnabled && isWakeMode) {
+            // Check ref to see if we should still be running
+            if (wakeWordEnabled && isWakeMode && isActiveRef.current) {
                 setTimeout(() => startWakeRecognition(), 1000);
             }
         };
