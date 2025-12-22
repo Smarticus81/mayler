@@ -30,13 +30,19 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
     }, []);
 
     const isActiveRef = useRef(isActive);
+    const onWakeRef = useRef(onWake);
+    const onChimeRef = useRef(onChime);
 
+    // Update refs when props change
     useEffect(() => {
         isActiveRef.current = isActive;
-    }, [isActive]);
+        onWakeRef.current = onWake;
+        onChimeRef.current = onChime;
+    }, [isActive, onWake, onChime]);
 
     const startWakeRecognition = useCallback(() => {
         // Double check active status via ref to avoid stale closures
+        // Also check if we are already running to avoid duplicate instances
         if (wakeRunningRef.current || !isActiveRef.current) return;
 
         console.log('[Wake Word] Starting recognition...');
@@ -61,8 +67,8 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
                     const now = Date.now();
                     if (now - lastWakeTimeRef.current > DEBOUNCE_MS) {
                         lastWakeTimeRef.current = now;
-                        onChime();
-                        onWake();
+                        onChimeRef.current(); // Use ref
+                        onWakeRef.current();  // Use ref
                     } else {
                         console.log('[Wake Word] Debounced - too soon after last trigger');
                     }
@@ -85,7 +91,7 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
         } catch (e) {
             console.error('Wake recognition start error:', e);
         }
-    }, [detectWakeWord, onWake, onChime, stopWakeRecognition, wakeWordEnabled, isWakeMode]);
+    }, [detectWakeWord, stopWakeRecognition, wakeWordEnabled, isWakeMode]); // Removed callback deps
 
     useEffect(() => {
         if (wakeWordEnabled && isWakeMode && isActive) {
