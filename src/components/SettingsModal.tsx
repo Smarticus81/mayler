@@ -10,7 +10,8 @@ export const SettingsModal: React.FC = () => {
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
 
-        rimeSpeakerId, setRimeSpeakerId
+        rimeSpeakerId, setRimeSpeakerId,
+        rimeModelId, setRimeModelId
     } = useMayler();
 
     const { triggerGoogleAuth } = useAuth();
@@ -76,6 +77,25 @@ export const SettingsModal: React.FC = () => {
                                         {speaker.charAt(0).toUpperCase() + speaker.slice(1)}
                                     </button>
                                 ))}
+                            </div>
+                        )}
+                        {voiceEngine === 'rime' && (
+                            <div style={{ marginTop: '15px' }}>
+                                <h4>Model</h4>
+                                <div className="voice-grid">
+                                    <button
+                                        className={`voice-btn ${rimeModelId === 'mist-v2' ? 'active' : ''}`}
+                                        onClick={() => setRimeModelId('mist-v2')}
+                                    >
+                                        Mist v2 (Fast)
+                                    </button>
+                                    <button
+                                        className={`voice-btn ${rimeModelId === 'arcana' ? 'active' : ''}`}
+                                        onClick={() => setRimeModelId('arcana')}
+                                    >
+                                        Arcana (Quality)
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

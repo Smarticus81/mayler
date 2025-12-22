@@ -78,6 +78,9 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [rimeSpeakerId, setRimeSpeakerId] = useState<string>(() => {
         return localStorage.getItem('mayler_rime_speaker') || 'marsh';
     });
+    const [rimeModelId, setRimeModelId] = useState<string>(() => {
+        return localStorage.getItem('mayler_rime_model') || 'mist-v2';
+    });
     const [showSettings, setShowSettings] = useState(false);
 
     // Persist settings to localStorage
@@ -97,6 +100,10 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         localStorage.setItem('mayler_rime_speaker', rimeSpeakerId);
     }, [rimeSpeakerId]);
 
+    useEffect(() => {
+        localStorage.setItem('mayler_rime_model', rimeModelId);
+    }, [rimeModelId]);
+
     const value = {
         connected, setConnected,
         loading, setLoading,
@@ -114,6 +121,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         voiceEngine, setVoiceEngine,
 
         rimeSpeakerId, setRimeSpeakerId,
+        rimeModelId, setRimeModelId,
         showSettings, setShowSettings,
     };
 

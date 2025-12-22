@@ -9,7 +9,7 @@ interface Message {
 }
 
 export const useRimePipeline = () => {
-    const { rimeSpeakerId, setError, setSpeaking, setListening, setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript } = useMayler();
+    const { rimeSpeakerId, rimeModelId, setError, setSpeaking, setListening, setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript } = useMayler();
     const { runTool, toolkitDefinitions } = useToolkit();
     const { startListening, stopListening, isListening: speechIsListening, interimTranscript: speechInterim, isSupported } = useRimeSpeechRecognition();
 
@@ -155,7 +155,11 @@ Your goal is to be the ultimate helpful assistant.`
             const ttsResponse = await fetch('/api/tts/rime', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: assistantMessage, speakerId: rimeSpeakerId }),
+                body: JSON.stringify({
+                    text: assistantMessage,
+                    speakerId: rimeSpeakerId,
+                    modelId: rimeModelId
+                }),
             });
 
             if (!ttsResponse.ok) {

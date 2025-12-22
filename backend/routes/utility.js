@@ -22,7 +22,7 @@ export const createUtilityRouter = (utilityService) => {
                 body: JSON.stringify({
                     text,
                     speaker: speakerId || 'marsh',
-                    modelId: 'mist-v2'
+                    modelId: req.body.modelId || 'mist-v2'
                 })
             });
 
