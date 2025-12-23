@@ -48,7 +48,7 @@ class GmailService {
           installed: {
             client_id: individualClientId,
             client_secret: individualClientSecret,
-            redirect_uris: [process.env.OAUTH_REDIRECT_URI || 'http://localhost:3000/api/gmail/auth-redirect']
+            redirect_uris: [] // Will determine redirect URI below
           }
         };
       } else {
@@ -68,12 +68,20 @@ class GmailService {
       }
       const { client_secret, client_id } = config;
 
-      // Use our auth redirect endpoint - prefer env var for flexibility
-      const redirectUri = process.env.OAUTH_REDIRECT_URI ||
-        (config.redirect_uris && config.redirect_uris[0]) ||
-        (process.env.NODE_ENV === 'production'
-          ? 'https://tisang-production.up.railway.app/api/gmail/auth-redirect'
-          : 'http://localhost:3000/api/gmail/auth-redirect');
+      // Prioritize environment variables and production status for the redirect URI
+      let redirectUri = process.env.OAUTH_REDIRECT_URI;
+
+      if (!redirectUri) {
+        if (process.env.NODE_ENV === 'production') {
+          // Default Railway production URL fallback
+          redirectUri = 'https://tisang-production.up.railway.app/api/gmail/auth-redirect';
+        } else if (config.redirect_uris && config.redirect_uris.length > 0) {
+          redirectUri = config.redirect_uris[0];
+        } else {
+          // Final fallback for local development
+          redirectUri = 'http://localhost:3000/api/gmail/auth-redirect';
+        }
+      }
 
       this.auth = new google.auth.OAuth2(client_id, client_secret, redirectUri);
 
