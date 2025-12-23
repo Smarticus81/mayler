@@ -169,7 +169,7 @@ class GmailService {
       if (!response.data.messages) return [];
 
       const emails = [];
-      for (const message of response.data.messages.slice(0, Math.min(maxResults, 50))) {
+      for (const message of response.data.messages.slice(0, Math.min(maxResults, 500))) {
         const email = await this.getEmailById(message.id);
         emails.push(email);
       }
