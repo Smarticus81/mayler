@@ -168,12 +168,11 @@ class GmailService {
 
       if (!response.data.messages) return [];
 
-      const emails = [];
-      for (const message of response.data.messages.slice(0, Math.min(maxResults, 500))) {
-        const email = await this.getEmailById(message.id);
-        emails.push(email);
-      }
+      const messagePromises = response.data.messages
+        .slice(0, Math.min(maxResults, 50))
+        .map(message => this.getEmailById(message.id));
 
+      const emails = await Promise.all(messagePromises);
       return emails;
     } catch (error) {
       console.error('Failed to get emails:', error?.message || error);
@@ -192,16 +191,16 @@ class GmailService {
 
       if (!resp.data.messages) return "No recent emails found in your inbox.";
 
-      const summaries = [];
-      for (const msg of resp.data.messages) {
-        const email = await this.gmail.users.messages.get({
+      const summaryPromises = resp.data.messages
+        .slice(0, maxResults)
+        .map(msg => this.gmail.users.messages.get({
           userId: 'me',
           id: msg.id,
           format: 'minimal'
-        });
-        summaries.push(`- ${email.data.snippet}`);
-      }
+        }));
 
+      const responses = await Promise.all(summaryPromises);
+      const summaries = responses.map(res => `- ${res.data.snippet}`);
       return summaries.join('\n');
     } catch (error) {
       console.error('Failed to summarize emails:', error);
@@ -221,12 +220,11 @@ class GmailService {
 
       if (!response.data.messages) return [];
 
-      const emails = [];
-      for (const message of response.data.messages) {
-        const email = await this.getEmailById(message.id);
-        emails.push(email);
-      }
+      const searchPromises = response.data.messages
+        .slice(0, maxResults)
+        .map(message => this.getEmailById(message.id));
 
+      const emails = await Promise.all(searchPromises);
       return emails;
     } catch (error) {
       console.error('Failed to search emails:', error);
