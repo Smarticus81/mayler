@@ -297,8 +297,14 @@ class GmailService {
         isImportant: email.data.labelIds?.includes('IMPORTANT')
       };
     } catch (error) {
+      if (error.code === 400 || error.status === 'INVALID_ARGUMENT') {
+        throw new Error(`Gmail API error: The email ID "${emailId}" is invalid. MUST BE A REAL HEX ID.`);
+      }
+      if (error.code === 404) {
+        throw new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+      }
       console.error('Failed to get email:', error);
-      throw new Error('Failed to retrieve email');
+      throw new Error(`Failed to retrieve email details: ${error.message}`);
     }
   }
 
@@ -602,8 +608,14 @@ ${originalEmail.body}
 
       return { success: true, id: emailId, permanent };
     } catch (error) {
+      if (error.code === 400) {
+        throw new Error(`Gmail API error: The email ID "${emailId}" is invalid.`);
+      }
+      if (error.code === 404) {
+        throw new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+      }
       console.error('Failed to delete email:', error);
-      throw new Error('Failed to delete email');
+      throw new Error(`Failed to delete email: ${error.message}`);
     }
   }
 
