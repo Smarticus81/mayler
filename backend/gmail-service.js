@@ -228,9 +228,12 @@ class GmailService {
 
       const searchPromises = response.data.messages
         .slice(0, maxResults)
-        .map(message => this.getEmailById(message.id));
+        .map(message => this.getEmailById(message.id).catch(err => {
+          console.warn(`Failed to fetch email details for search result ${message.id}:`, err.message);
+          return null;
+        }));
 
-      const emails = await Promise.all(searchPromises);
+      const emails = (await Promise.all(searchPromises)).filter(e => e !== null);
       return emails;
     } catch (error) {
       console.error('Failed to search emails:', error);
@@ -297,14 +300,21 @@ class GmailService {
         isImportant: email.data.labelIds?.includes('IMPORTANT')
       };
     } catch (error) {
-      if (error.code === 400 || error.status === 'INVALID_ARGUMENT') {
-        throw new Error(`Gmail API error: The email ID "${emailId}" is invalid. MUST BE A REAL HEX ID.`);
+      const status = error.code || error.response?.status;
+      if (status === 400 || error.status === 'INVALID_ARGUMENT') {
+        const err = new Error(`Gmail API error: The email ID "${emailId}" is invalid. MUST BE A REAL HEX ID.`);
+        err.status = 400;
+        throw err;
       }
-      if (error.code === 404) {
-        throw new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+      if (status === 404) {
+        const err = new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+        err.status = 404;
+        throw err;
       }
       console.error('Failed to get email:', error);
-      throw new Error(`Failed to retrieve email details: ${error.message}`);
+      const err = new Error(`Failed to retrieve email details: ${error.message}`);
+      err.status = status || 500;
+      throw err;
     }
   }
 
@@ -608,14 +618,21 @@ ${originalEmail.body}
 
       return { success: true, id: emailId, permanent };
     } catch (error) {
-      if (error.code === 400) {
-        throw new Error(`Gmail API error: The email ID "${emailId}" is invalid.`);
+      const status = error.code || error.response?.status;
+      if (status === 400) {
+        const err = new Error(`Gmail API error: The email ID "${emailId}" is invalid.`);
+        err.status = 400;
+        throw err;
       }
-      if (error.code === 404) {
-        throw new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+      if (status === 404) {
+        const err = new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+        err.status = 404;
+        throw err;
       }
       console.error('Failed to delete email:', error);
-      throw new Error(`Failed to delete email: ${error.message}`);
+      const err = new Error(`Failed to delete email: ${error.message}`);
+      err.status = status || 500;
+      throw err;
     }
   }
 

@@ -119,7 +119,7 @@ export const createGmailRouter = (gmailService) => {
             const email = await gmailService.getEmailById(req.params.id);
             res.json({ email });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: error.message });
         }
     });
 
@@ -129,7 +129,7 @@ export const createGmailRouter = (gmailService) => {
             const result = await gmailService.deleteEmail(req.params.id, permanent === 'true');
             res.json({ success: true, result });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: error.message });
         }
     });
 
@@ -140,7 +140,7 @@ export const createGmailRouter = (gmailService) => {
             const result = await gmailService.deleteEmail(emailId, permanent);
             res.json({ success: true, result });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error.status || 500).json({ error: error.message });
         }
     });
 
