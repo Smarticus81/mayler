@@ -170,9 +170,12 @@ class GmailService {
 
       const messagePromises = response.data.messages
         .slice(0, Math.min(maxResults, 50))
-        .map(message => this.getEmailById(message.id));
+        .map(message => this.getEmailById(message.id).catch(err => {
+          console.warn(`Failed to fetch email details for ${message.id}:`, err.message);
+          return null;
+        }));
 
-      const emails = await Promise.all(messagePromises);
+      const emails = (await Promise.all(messagePromises)).filter(e => e !== null);
       return emails;
     } catch (error) {
       console.error('Failed to get emails:', error?.message || error);
@@ -197,9 +200,12 @@ class GmailService {
           userId: 'me',
           id: msg.id,
           format: 'minimal'
+        }).catch(err => {
+          console.warn(`Failed to fetch summary for ${msg.id}:`, err.message);
+          return null;
         }));
 
-      const responses = await Promise.all(summaryPromises);
+      const responses = (await Promise.all(summaryPromises)).filter(r => r !== null);
       const summaries = responses.map(res => `- ${res.data.snippet}`);
       return summaries.join('\n');
     } catch (error) {
