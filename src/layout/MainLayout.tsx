@@ -15,7 +15,7 @@ export const MainLayout: React.FC = () => {
     const pipeline = useWebRTC();
     const { connect, disconnect, remoteAudioElRef, audioLevel } = pipeline;
 
-    const { initAudioContext, playWakeChime } = useAudio();
+    const { initAudioContext, playWakeChime, playGreeting } = useAudio();
     const [isActive, setIsActive] = useState(false);
 
     const handleStart = () => {
@@ -30,7 +30,10 @@ export const MainLayout: React.FC = () => {
             console.log('Wake word detected! Connecting...');
             connect();
         },
-        playWakeChime,
+        () => {
+            playWakeChime();
+            playGreeting();
+        },
         isActive && !connected
     );
 

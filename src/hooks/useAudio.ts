@@ -63,8 +63,21 @@ export const useAudio = () => {
         }
     }, [initAudioContext]);
 
+    const playGreeting = useCallback(() => {
+        const greetings = ["I'm here.", "Yes?", "Listening.", "Go ahead.", "Ready."];
+        const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+
+        if ('speechSynthesis' in window) {
+            const utterance = new SpeechSynthesisUtterance(randomGreeting);
+            utterance.rate = 1.2; // Slightly faster for responsiveness
+            utterance.volume = 0.8;
+            window.speechSynthesis.speak(utterance);
+        }
+    }, []);
+
     return {
         initAudioContext,
         playWakeChime,
+        playGreeting,
     };
 };

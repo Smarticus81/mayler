@@ -60,12 +60,14 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
             const idx = event.resultIndex;
             const transcript = results[idx][0].transcript;
             const isFinal = results[idx].isFinal;
+            const confidence = results[idx][0].confidence;
 
-            if (isFinal || results[idx][0].confidence > 0.5) {
-                if (detectWakeWord(transcript)) {
+            // Lower thresholds for ultra-low latency detection
+            if (isFinal || confidence > 0.3) {
+                if (WAKE_WORDS.some(w => similarity(transcript, w) > 0.65 || transcript.toLowerCase().includes(w))) {
                     // Debounce: only trigger if enough time has passed
                     const now = Date.now();
-                    if (now - lastWakeTimeRef.current > DEBOUNCE_MS) {
+                    if (now - lastWakeTimeRef.current > 1000) { // Reduced debounce to 1s
                         lastWakeTimeRef.current = now;
                         onChimeRef.current(); // Use ref
                         onWakeRef.current();  // Use ref
