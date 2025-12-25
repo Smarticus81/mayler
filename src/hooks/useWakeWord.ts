@@ -13,7 +13,6 @@ export const useWakeWord = (onWake: () => void, onChime: () => void, isActive: b
     const recognizerRef = useRef<any>(null);
     const wakeRunningRef = useRef(false);
     const lastWakeTimeRef = useRef(0);
-    const DEBOUNCE_MS = 3000; // 3 seconds between wake word triggers
 
     const detectWakeWord = useCallback((transcript: string) => {
         const s = sanitize(transcript);
