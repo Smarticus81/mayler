@@ -211,6 +211,46 @@ export const useToolkit = () => {
                     });
                     return await safeJson(resp);
                 }
+                case 'create_draft': {
+                    const resp = await fetch('/api/gmail/drafts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: a.to, subject: a.subject, text: a.text, cc: a.cc, bcc: a.bcc }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'list_drafts': {
+                    const resp = await fetch(`/api/gmail/drafts?maxResults=${a.maxResults || 10}`);
+                    return await safeJson(resp);
+                }
+                case 'update_draft': {
+                    const resp = await fetch(`/api/gmail/drafts/${a.draftId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: a.to, subject: a.subject, text: a.text, cc: a.cc, bcc: a.bcc }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'send_draft': {
+                    const resp = await fetch(`/api/gmail/drafts/${a.draftId}/send`, {
+                        method: 'POST',
+                    });
+                    return await safeJson(resp);
+                }
+                case 'delete_draft': {
+                    const resp = await fetch(`/api/gmail/drafts/${a.draftId}`, {
+                        method: 'DELETE',
+                    });
+                    return await safeJson(resp);
+                }
+                case 'forward_email': {
+                    const resp = await fetch(`/api/gmail/forward/${a.emailId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ to: a.to, text: a.text }),
+                    });
+                    return await safeJson(resp);
+                }
                 case 'update_calendar_event': {
                     const resp = await fetch('/api/calendar/update', {
                         method: 'POST',
@@ -371,6 +411,14 @@ export const useToolkit = () => {
         { type: 'function', name: 'mark_email_unread', description: 'Marks an email as unread in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'star_email', description: 'Stars an email in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'archive_email', description: 'Archives an email (removes from Inbox) in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
+
+        // Draft Operations
+        { type: 'function', name: 'create_draft', description: 'Creates and SAVES a draft email (does NOT send). Use this when user wants to draft/compose an email for later.', parameters: { type: 'object', properties: { to: { type: 'string', description: 'Recipient email address' }, subject: { type: 'string', description: 'Email subject' }, text: { type: 'string', description: 'Email body text' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] } },
+        { type: 'function', name: 'list_drafts', description: 'Lists all draft emails in Gmail.', parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 10 } } } },
+        { type: 'function', name: 'update_draft', description: 'Updates an existing draft email.', parameters: { type: 'object', properties: { draftId: { type: 'string', description: 'Draft ID from list_drafts' }, to: { type: 'string' }, subject: { type: 'string' }, text: { type: 'string' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['draftId'] } },
+        { type: 'function', name: 'send_draft', description: 'Sends a previously created draft email.', parameters: { type: 'object', properties: { draftId: { type: 'string', description: 'Draft ID from list_drafts' } }, required: ['draftId'] } },
+        { type: 'function', name: 'delete_draft', description: 'Deletes a draft email.', parameters: { type: 'object', properties: { draftId: { type: 'string', description: 'Draft ID from list_drafts' } }, required: ['draftId'] } },
+        { type: 'function', name: 'forward_email', description: 'Forwards an email to another recipient.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'Email ID to forward' }, to: { type: 'string', description: 'Recipient email address' }, text: { type: 'string', description: 'Optional message to add' } }, required: ['emailId', 'to'] } },
 
         // Calendar Operations
         { type: 'function', name: 'create_calendar_event', description: "Creates a new event in the user's Google Calendar.", parameters: { type: 'object', properties: { summary: { type: 'string', description: 'Title of the event' }, description: { type: 'string', description: 'Description or details of the event' }, start: { type: 'string', description: 'Start time in ISO 8601 format' }, end: { type: 'string', description: 'End time in ISO 8601 format' }, location: { type: 'string', description: 'Location of the event' }, attendees: { type: 'array', items: { type: 'string' }, description: 'List of email addresses to invite' } }, required: ['summary', 'start', 'end'] } },

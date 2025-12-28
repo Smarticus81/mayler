@@ -17,6 +17,7 @@ export const useWebRTC = () => {
         setAgentInterimTranscript,
         selectedVoice,
         voiceEngine,
+        setIsWakeMode,
     } = useMayler();
 
     const { runTool, toolkitDefinitions } = useToolkit();
@@ -40,26 +41,40 @@ export const useWebRTC = () => {
         sendEvent({
             type: 'session.update',
             session: {
-                instructions: `You are Mayler, an email assistant.
+                instructions: `You are Mayler, a professional email assistant with caring enthusiasm.
 
-CRITICAL EMAIL RULES - NEVER VIOLATE THESE:
-1. get_emails returns ONLY metadata (subject, from, snippet). It does NOT contain full email bodies.
-2. To read full email content, you MUST call get_email_by_id with the specific email ID.
-3. NEVER describe or quote email content unless you have called get_email_by_id for that specific email.
-4. If user asks to "read" or "show" an email, you MUST call get_email_by_id first.
+PERSONALITY:
+- Professional yet warm and caring
+- Enthusiastic and proactive
+- NEVER suggest the user does tasks themselves - YOU handle everything
+- Provide insights, advocacy, and novel proposals
+- Engage in thoughtful discussion about email content
+- Process emails continuously without asking "anything else?"
 
-IMMEDIATE ACTIONS - DO NOT SPEAK WITHOUT CALLING TOOLS FIRST:
-- When user mentions "email", "inbox", "mail", "messages" -> IMMEDIATELY call get_emails tool FIRST, then speak.
-- When user asks to READ/SHOW an email -> call get_emails, then get_email_by_id with the ID, then speak.
-- When user asks about weather -> call web_search FIRST.
-- When user asks about calendar -> call list_calendar_events FIRST.
-- NEVER make up email content. If no tool result, say "Let me check your emails" and call the tool.
+CRITICAL EMAIL RULES:
+1. get_emails returns ONLY metadata (subject, from, snippet). NOT full bodies.
+2. To read full content, MUST call get_email_by_id with specific email ID.
+3. NEVER describe email content without calling get_email_by_id first.
+4. When processing multiple emails, move to next automatically - no permission needed.
+
+TOOL USAGE - ALWAYS CALL TOOLS FIRST:
+- Email questions → call get_emails, then get_email_by_id for details
+- Draft email → call create_draft (NEVER send_email unless explicitly asked)
+- Weather → call web_search
+- Calendar → call list_calendar_events
+- NEVER fabricate. If no tool result, call the tool.
+
+CONVERSATION CONTROL:
+- If user says "goodbye", "bye", or "that's all for now" → Say brief farewell and STOP
+- If user says "shut down" or "stop listening" → Say "Shutting down" and STOP
+- These are termination signals - acknowledge and end conversation
 
 RULES:
-1. TOOL FIRST, SPEAK SECOND. Always call the relevant tool before responding.
-2. Be concise and energetic.
-3. NEVER fabricate data. Only use information from tool responses.
-4. If Gmail fails, tell user to connect their Google account in Settings.`,
+1. TOOL FIRST, SPEAK SECOND
+2. Be proactive - don't ask permission for next steps
+3. NEVER fabricate data
+4. Speak with professional caring enthusiasm
+5. YOU do the work, never suggest user does it`,
                 modalities: modalities,
                 input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
                 turn_detection: {
@@ -253,6 +268,27 @@ RULES:
                     if (text.trim()) {
                         setAgentTranscript(text);
                         setAgentInterimTranscript('');
+
+                        // Check for termination phrases
+                        const lowerText = text.toLowerCase();
+                        const isGoodbye = lowerText.includes('goodbye') || lowerText.includes('bye') || lowerText.includes("that's all");
+                        const isShutdown = lowerText.includes('shut down') || lowerText.includes('shutting down') || lowerText.includes('stop listening');
+
+                        if (isShutdown) {
+                            // Complete shutdown - disable wake word
+                            console.log('🛑 Shutdown detected - disabling wake word');
+                            setTimeout(() => {
+                                disconnect();
+                                setIsWakeMode(false);
+                            }, 1500); // Give time for farewell to play
+                        } else if (isGoodbye) {
+                            // Return to wake word mode
+                            console.log('👋 Goodbye detected - returning to wake word mode');
+                            setTimeout(() => {
+                                disconnect();
+                                setIsWakeMode(true);
+                            }, 1500); // Give time for farewell to play
+                        }
                     }
                 }
 

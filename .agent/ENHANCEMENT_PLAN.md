@@ -162,6 +162,62 @@ Major enhancements to make Mayler more proactive, capable, and user-friendly.
 
 ---
 
+## 8. 📸 Document Analysis & Vision
+
+### Requirements:
+- User can show documents to Mayler
+- Camera/video capture for document photos
+- Support multiple documents
+- AI vision analysis and insights
+- OCR for text extraction
+
+### Implementation:
+- [ ] Add camera capture component
+- [ ] Implement multi-image upload
+- [ ] Add `analyze_document` tool
+- [ ] Integrate GPT-4 Vision API
+- [ ] Add document context to conversation
+- [ ] Store document references
+
+**Files to create:**
+- `src/components/CameraCapture.tsx`
+- `src/components/DocumentUpload.tsx`
+- `src/hooks/useCamera.ts`
+
+**Files to modify:**
+- `src/hooks/useToolkit.ts` - Add vision tools
+- `backend/routes/vision.js` - New vision API routes
+- `src/hooks/useWebRTC.ts` - Add vision context
+
+---
+
+## 9. 📱 Mobile Optimization
+
+### Requirements:
+- Ultra-optimized for phone screens
+- Touch-friendly UI
+- Responsive layouts
+- Mobile-first design
+- PWA capabilities
+
+### Implementation:
+- [ ] Responsive breakpoints for all components
+- [ ] Touch gesture support
+- [ ] Mobile-optimized orb/visualizer
+- [ ] Bottom sheet for settings
+- [ ] Haptic feedback
+- [ ] PWA manifest and service worker
+- [ ] Mobile voice input optimization
+
+**Files to modify:**
+- `index.css` - Mobile-first responsive styles
+- `src/components/VoiceOrb.tsx` - Mobile scaling
+- `src/components/SettingsModal.tsx` - Bottom sheet on mobile
+- `src/layout/MainLayout.tsx` - Mobile layout
+- `public/manifest.json` - PWA config
+
+---
+
 ## Implementation Priority
 
 ### Phase 1 (Critical - Do First):
@@ -172,10 +228,12 @@ Major enhancements to make Mayler more proactive, capable, and user-friendly.
 ### Phase 2 (High Priority):
 4. 🔄 Proactive email processing
 5. 🌐 Comprehensive web browsing
+6. 📸 Document analysis & vision
 
 ### Phase 3 (Polish):
-6. 🌊 Streaming visual
-7. 🎨 Error notifications
+7. 🌊 Streaming visual
+8. 🎨 Error notifications
+9. 📱 Mobile optimization
 
 ---
 
@@ -188,10 +246,12 @@ Major enhancements to make Mayler more proactive, capable, and user-friendly.
 | Personality | Low | 15 min |
 | Proactive processing | Medium | 30 min |
 | Web browsing | High | 1 hour |
+| Document analysis | High | 1-2 hours |
 | Streaming visual | High | 1-2 hours |
 | Error toasts | Medium | 45 min |
+| Mobile optimization | High | 2-3 hours |
 
-**Total:** ~5-7 hours of implementation
+**Total:** ~9-13 hours of implementation
 
 ---
 
@@ -201,3 +261,5 @@ Major enhancements to make Mayler more proactive, capable, and user-friendly.
 - Test each phase before moving to next
 - Commit after each major feature
 - Update documentation as we go
+- Mobile-first approach for all new UI components
+- Vision API requires GPT-4 Vision model access

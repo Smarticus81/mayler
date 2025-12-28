@@ -266,5 +266,108 @@ export const createGmailRouter = (gmailService) => {
         }
     });
 
+    // Draft Operations
+    router.post('/drafts', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📝 [Gmail API] POST /drafts - Creating draft');
+        console.log(`📋 To: ${req.body.to}, Subject: "${req.body.subject}"`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const { to, subject, text, cc, bcc } = req.body;
+            const draft = await gmailService.createDraft({ to, subject, text, cc, bcc });
+            console.log(`✅ [Gmail API] Draft created with ID: ${draft.id}`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ success: true, draft });
+        } catch (error) {
+            console.error('❌ [Gmail API] Create draft failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.get('/drafts', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📋 [Gmail API] GET /drafts - Listing drafts');
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const maxResults = parseInt(req.query.maxResults) || 10;
+            const drafts = await gmailService.listDrafts(maxResults);
+            console.log(`✅ [Gmail API] Found ${drafts.length} drafts`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ drafts });
+        } catch (error) {
+            console.error('❌ [Gmail API] List drafts failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.put('/drafts/:id', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log(`📝 [Gmail API] PUT /drafts/${req.params.id} - Updating draft`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const { to, subject, text, cc, bcc } = req.body;
+            const draft = await gmailService.updateDraft(req.params.id, { to, subject, text, cc, bcc });
+            console.log(`✅ [Gmail API] Draft updated`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ success: true, draft });
+        } catch (error) {
+            console.error('❌ [Gmail API] Update draft failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/drafts/:id/send', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log(`📤 [Gmail API] POST /drafts/${req.params.id}/send - Sending draft`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const result = await gmailService.sendDraft(req.params.id);
+            console.log(`✅ [Gmail API] Draft sent successfully`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ success: true, result });
+        } catch (error) {
+            console.error('❌ [Gmail API] Send draft failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.delete('/drafts/:id', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log(`🗑️ [Gmail API] DELETE /drafts/${req.params.id} - Deleting draft`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const result = await gmailService.deleteDraft(req.params.id);
+            console.log(`✅ [Gmail API] Draft deleted`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ success: true, result });
+        } catch (error) {
+            console.error('❌ [Gmail API] Delete draft failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/forward/:id', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log(`↪️ [Gmail API] POST /forward/${req.params.id} - Forwarding email`);
+        console.log(`📋 To: ${req.body.to}`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        try {
+            const { to, text } = req.body;
+            const result = await gmailService.forwardEmail(req.params.id, to, text);
+            console.log(`✅ [Gmail API] Email forwarded successfully`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.json({ success: true, result });
+        } catch (error) {
+            console.error('❌ [Gmail API] Forward email failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
+            res.status(500).json({ error: error.message });
+        }
+    });
+
     return router;
 };
