@@ -74,51 +74,104 @@ export const createGmailRouter = (gmailService) => {
     });
 
     router.get('/emails', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📧 [Gmail API] GET /emails - Fetching emails from Gmail');
+        console.log(`📋 Parameters: maxResults=${req.query.maxResults || 10}`);
+        console.log('═══════════════════════════════════════════════════════════════');
         try {
             const maxResults = parseInt(req.query.maxResults) || 10;
             const emails = await gmailService.getRecentEmails(maxResults);
+            console.log(`✅ [Gmail API] Successfully fetched ${emails?.length || 0} emails`);
+            if (emails?.length > 0) {
+                console.log('📬 Email subjects:');
+                emails.slice(0, 5).forEach((e, i) => console.log(`   ${i + 1}. ${e.subject || '(no subject)'}`));
+            }
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.json({ emails });
         } catch (error) {
+            console.error('❌ [Gmail API] Failed to fetch emails:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.status(500).json({ error: error.message });
         }
     });
 
     router.post('/summarize', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📝 [Gmail API] POST /summarize - Summarizing emails');
+        console.log(`📋 Parameters: maxResults=${req.body.maxResults || 10}`);
+        console.log('═══════════════════════════════════════════════════════════════');
         try {
             const maxResults = parseInt(req.body.maxResults) || 10;
             const result = await gmailService.summarizeEmails(maxResults);
+            console.log('✅ [Gmail API] Email summary generated successfully');
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.json({ result });
         } catch (error) {
+            console.error('❌ [Gmail API] Summarize failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.status(500).json({ error: error.message });
         }
     });
 
     router.post('/search', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('🔍 [Gmail API] POST /search - Searching emails');
+        console.log(`📋 Query: "${req.body.query}", maxResults=${req.body.maxResults || 5}`);
+        console.log('═══════════════════════════════════════════════════════════════');
         try {
             const { query, maxResults = 5 } = req.body;
-            if (!query) return res.status(400).json({ error: 'Query required' });
+            if (!query) {
+                console.log('⚠️ [Gmail API] Search aborted - no query provided');
+                return res.status(400).json({ error: 'Query required' });
+            }
             const emails = await gmailService.searchEmails(query, maxResults);
+            console.log(`✅ [Gmail API] Search returned ${emails?.length || 0} results`);
+            if (emails?.length > 0) {
+                console.log('📬 Search results:');
+                emails.slice(0, 5).forEach((e, i) => console.log(`   ${i + 1}. ${e.subject || '(no subject)'}`));
+            }
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.json({ emails });
         } catch (error) {
+            console.error('❌ [Gmail API] Search failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.status(500).json({ error: error.message });
         }
     });
 
     router.post('/send', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📤 [Gmail API] POST /send - Sending email');
+        console.log(`📋 To: ${req.body.to}, Subject: "${req.body.subject}"`);
+        console.log('═══════════════════════════════════════════════════════════════');
         try {
             const { to, subject, text, cc, bcc } = req.body;
             const result = await gmailService.sendEmail({ to, subject, text, cc, bcc });
+            console.log('✅ [Gmail API] Email sent successfully');
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.json({ success: true, result });
         } catch (error) {
+            console.error('❌ [Gmail API] Send failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.status(500).json({ error: error.message });
         }
     });
 
     router.get('/email/:id', ensureAuth, async (req, res) => {
+        console.log('\n═══════════════════════════════════════════════════════════════');
+        console.log('📖 [Gmail API] GET /email/:id - Fetching full email content');
+        console.log(`📋 Email ID: ${req.params.id}`);
+        console.log('═══════════════════════════════════════════════════════════════');
         try {
             const email = await gmailService.getEmailById(req.params.id);
+            console.log(`✅ [Gmail API] Successfully fetched email: "${email.subject || '(no subject)'}"`);
+            console.log(`📧 From: ${email.from || 'unknown'}`);
+            console.log(`📝 Body length: ${email.body?.length || 0} characters`);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.json({ email });
         } catch (error) {
+            console.error('❌ [Gmail API] Get email by ID failed:', error.message);
+            console.log('═══════════════════════════════════════════════════════════════\n');
             res.status(error.status || 500).json({ error: error.message });
         }
     });

@@ -42,11 +42,17 @@ export const useWebRTC = () => {
             session: {
                 instructions: `You are Mayler, an email assistant.
 
+CRITICAL EMAIL RULES - NEVER VIOLATE THESE:
+1. get_emails returns ONLY metadata (subject, from, snippet). It does NOT contain full email bodies.
+2. To read full email content, you MUST call get_email_by_id with the specific email ID.
+3. NEVER describe or quote email content unless you have called get_email_by_id for that specific email.
+4. If user asks to "read" or "show" an email, you MUST call get_email_by_id first.
+
 IMMEDIATE ACTIONS - DO NOT SPEAK WITHOUT CALLING TOOLS FIRST:
 - When user mentions "email", "inbox", "mail", "messages" -> IMMEDIATELY call get_emails tool FIRST, then speak.
+- When user asks to READ/SHOW an email -> call get_emails, then get_email_by_id with the ID, then speak.
 - When user asks about weather -> call web_search FIRST.
 - When user asks about calendar -> call list_calendar_events FIRST.
-- NEVER describe emails without calling get_emails first.
 - NEVER make up email content. If no tool result, say "Let me check your emails" and call the tool.
 
 RULES:
@@ -78,6 +84,17 @@ RULES:
     }, [setConnected, setSpeaking, setListening]);
 
     const handleFunctionCall = useCallback(async (call_id: string, name: string, rawArgs: unknown) => {
+        // ═══════════════════════════════════════════════════════════════════
+        // 📡 AGENT FUNCTION CALL RECEIVED
+        // ═══════════════════════════════════════════════════════════════════
+        console.log(`\n%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'color: #a78bfa');
+        console.log(`%c📡 AGENT FUNCTION CALL RECEIVED`, 'color: #a78bfa; font-weight: bold; font-size: 14px');
+        console.log(`%cCall ID: ${call_id}`, 'color: #94a3b8');
+        console.log(`%cFunction: ${name}`, 'color: #fbbf24; font-weight: bold');
+        console.log(`%cRaw Arguments:`, 'color: #94a3b8');
+        console.log(rawArgs);
+        console.log(`%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`, 'color: #a78bfa');
+
         let args: unknown = rawArgs;
         if (typeof rawArgs === 'string') {
             try {

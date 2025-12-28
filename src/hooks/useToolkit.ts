@@ -5,312 +5,354 @@ export const useToolkit = () => {
     const runTool = useCallback(async (name: string, args: unknown) => {
         const a = asObject(args) ?? {};
 
-        switch (name) {
-            case 'google_auth_setup': {
-                const resp = await fetch('/api/gmail/auth-url');
-                const data = await safeJson(resp);
+        // ═══════════════════════════════════════════════════════════════════
+        // 🔧 TOOL CALL LOGGING - See exactly what the agent is invoking
+        // ═══════════════════════════════════════════════════════════════════
+        console.log(`\n%c══════════════════════════════════════════════════════════════`, 'color: #6ee7b7');
+        console.log(`%c🔧 TOOL CALL: ${name}`, 'color: #6ee7b7; font-weight: bold; font-size: 14px');
+        console.log(`%c📋 ARGUMENTS:`, 'color: #fbbf24; font-weight: bold');
+        console.log(JSON.stringify(a, null, 2));
+        console.log(`%c⏳ Executing...`, 'color: #94a3b8');
+        const startTime = performance.now();
 
-                if (resp.ok && data.authUrl) {
-                    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                        (window.navigator as any).standalone === true;
+        // Inner function to execute the tool - allows us to capture result for logging
+        const executeTool = async (): Promise<unknown> => {
+            switch (name) {
+                case 'google_auth_setup': {
+                    const resp = await fetch('/api/gmail/auth-url');
+                    const data = await safeJson(resp);
 
-                    if (isStandalone) {
-                        window.location.href = data.authUrl;
-                        return { success: true, message: 'Redirecting to Google authentication...' };
+                    if (resp.ok && data.authUrl) {
+                        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                            (window.navigator as any).standalone === true;
+
+                        if (isStandalone) {
+                            window.location.href = data.authUrl;
+                            return { success: true, message: 'Redirecting to Google authentication...' };
+                        }
+
+                        const width = 600;
+                        const height = 700;
+                        const left = window.screenX + (window.outerWidth - width) / 2;
+                        const top = window.screenY + (window.outerHeight - height) / 2;
+
+                        window.open(
+                            data.authUrl,
+                            'Google Authentication',
+                            `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
+                        );
+
+                        return {
+                            success: true,
+                            message: 'Opening Google authentication window. Please complete the authorization process.'
+                        };
                     }
-
-                    const width = 600;
-                    const height = 700;
-                    const left = window.screenX + (window.outerWidth - width) / 2;
-                    const top = window.screenY + (window.outerHeight - height) / 2;
-
-                    window.open(
-                        data.authUrl,
-                        'Google Authentication',
-                        `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
-                    );
-
-                    return {
-                        success: true,
-                        message: 'Opening Google authentication window. Please complete the authorization process.'
-                    };
+                    return data;
                 }
-                return data;
+                case 'create_calendar_event': {
+                    const resp = await fetch('/api/calendar/events', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(a),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'list_calendar_events': {
+                    const params = new URLSearchParams();
+                    if (a.timeMin) params.set('timeMin', String(a.timeMin));
+                    if (a.timeMax) params.set('timeMax', String(a.timeMax));
+                    if (a.maxResults != null) params.set('maxResults', String(a.maxResults));
+                    if (a.query) params.set('query', String(a.query));
+                    const resp = await fetch(`/api/calendar/events?${params.toString()}`);
+                    return await safeJson(resp);
+                }
+                case 'get_emails': {
+                    const maxResults = (a.maxResults as number | undefined) ?? 5;
+                    const resp = await fetch(`/api/gmail/emails?maxResults=${encodeURIComponent(String(maxResults))}`);
+                    return await safeJson(resp);
+                }
+                case 'search_emails': {
+                    const resp = await fetch('/api/gmail/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'send_email': {
+                    const resp = await fetch('/api/gmail/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(a),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'web_search': {
+                    const resp = await fetch('/api/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_weather': {
+                    const resp = await fetch('/api/weather', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ location: a.location, units: a.units }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'calculate': {
+                    const resp = await fetch('/api/calculate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ expression: a.expression }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_stock_price': {
+                    const resp = await fetch('/api/stock', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol: a.symbol }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_crypto_price': {
+                    const resp = await fetch('/api/crypto', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ symbol: a.symbol, currency: a.currency }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_definition': {
+                    const resp = await fetch('/api/definition', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ word: a.word }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'wikipedia_search': {
+                    const resp = await fetch('/api/wikipedia', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'convert_units': {
+                    const resp = await fetch('/api/convert', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ value: a.value, from: a.from, to: a.to }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_time': {
+                    const resp = await fetch('/api/time', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ timezone: a.timezone }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'set_reminder': {
+                    const resp = await fetch('/api/calendar/action-item', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            actionItem: a.title,
+                            dueDate: a.dateTime,
+                            priority: a.priority ?? 'medium',
+                        }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'delete_email': {
+                    const resp = await fetch('/api/gmail/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: a.emailId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'mark_email_read': {
+                    const resp = await fetch('/api/gmail/mark-read', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: a.emailId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'mark_email_unread': {
+                    const resp = await fetch('/api/gmail/mark-unread', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: a.emailId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'star_email': {
+                    const resp = await fetch('/api/gmail/star', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: a.emailId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'archive_email': {
+                    const resp = await fetch('/api/gmail/archive', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emailId: a.emailId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'update_calendar_event': {
+                    const resp = await fetch('/api/calendar/update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(a),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'delete_calendar_event': {
+                    const resp = await fetch('/api/calendar/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ eventId: a.eventId }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_news': {
+                    const resp = await fetch('/api/news', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ category: a.category, country: a.country }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'convert_currency': {
+                    const resp = await fetch('/api/currency', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ amount: a.amount, from: a.from, to: a.to }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'translate_text': {
+                    const resp = await fetch('/api/translate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: a.text, targetLanguage: a.targetLang, sourceLanguage: a.sourceLang }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'set_timer': {
+                    const resp = await fetch('/api/timer', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ duration: a.duration, label: a.label }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'create_note': {
+                    const resp = await fetch('/api/notes', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: a.title, content: a.content }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'reply_to_email': {
+                    const resp = await fetch(`/api/gmail/reply/${a.emailId}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: a.text, html: a.html }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_email_by_id': {
+                    const resp = await fetch(`/api/gmail/email/${a.emailId}`);
+                    return await safeJson(resp);
+                }
+                case 'summarize_emails': {
+                    const resp = await fetch('/api/gmail/summarize', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ maxResults: (a.maxResults as number | undefined) ?? 10 }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'search_images': {
+                    const resp = await fetch('/api/search/images', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'search_videos': {
+                    const resp = await fetch('/api/search/videos', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'get_factual_info': {
+                    const resp = await fetch('/api/search/facts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'disconnect_session': {
+                    // This is a client-side signal; the component using this hook 
+                    // should listen for this call or we just return a special signal.
+                    // In this architecture, returning a specific success message is enough
+                    // for the model to know it "worked", but the actual disconnect
+                    // needs to happen in the UI layer or via an event listener.
+                    // For now, we will assume the model stops context.
+                    return { success: true, message: 'Session disconnected' };
+                }
+                default:
+                    return { error: `Unknown tool: ${name}` };
             }
-            case 'create_calendar_event': {
-                const resp = await fetch('/api/calendar/events', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(a),
-                });
-                return await safeJson(resp);
-            }
-            case 'list_calendar_events': {
-                const params = new URLSearchParams();
-                if (a.timeMin) params.set('timeMin', String(a.timeMin));
-                if (a.timeMax) params.set('timeMax', String(a.timeMax));
-                if (a.maxResults != null) params.set('maxResults', String(a.maxResults));
-                if (a.query) params.set('query', String(a.query));
-                const resp = await fetch(`/api/calendar/events?${params.toString()}`);
-                return await safeJson(resp);
-            }
-            case 'get_emails': {
-                const maxResults = (a.maxResults as number | undefined) ?? 5;
-                const resp = await fetch(`/api/gmail/emails?maxResults=${encodeURIComponent(String(maxResults))}`);
-                return await safeJson(resp);
-            }
-            case 'search_emails': {
-                const resp = await fetch('/api/gmail/search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
-                });
-                return await safeJson(resp);
-            }
-            case 'send_email': {
-                const resp = await fetch('/api/gmail/send', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(a),
-                });
-                return await safeJson(resp);
-            }
-            case 'web_search': {
-                const resp = await fetch('/api/search', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_weather': {
-                const resp = await fetch('/api/weather', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ location: a.location, units: a.units }),
-                });
-                return await safeJson(resp);
-            }
-            case 'calculate': {
-                const resp = await fetch('/api/calculate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ expression: a.expression }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_stock_price': {
-                const resp = await fetch('/api/stock', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: a.symbol }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_crypto_price': {
-                const resp = await fetch('/api/crypto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: a.symbol, currency: a.currency }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_definition': {
-                const resp = await fetch('/api/definition', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ word: a.word }),
-                });
-                return await safeJson(resp);
-            }
-            case 'wikipedia_search': {
-                const resp = await fetch('/api/wikipedia', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query }),
-                });
-                return await safeJson(resp);
-            }
-            case 'convert_units': {
-                const resp = await fetch('/api/convert', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ value: a.value, from: a.from, to: a.to }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_time': {
-                const resp = await fetch('/api/time', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ timezone: a.timezone }),
-                });
-                return await safeJson(resp);
-            }
-            case 'set_reminder': {
-                const resp = await fetch('/api/calendar/action-item', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        actionItem: a.title,
-                        dueDate: a.dateTime,
-                        priority: a.priority ?? 'medium',
-                    }),
-                });
-                return await safeJson(resp);
-            }
-            case 'delete_email': {
-                const resp = await fetch('/api/gmail/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emailId: a.emailId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'mark_email_read': {
-                const resp = await fetch('/api/gmail/mark-read', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emailId: a.emailId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'mark_email_unread': {
-                const resp = await fetch('/api/gmail/mark-unread', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emailId: a.emailId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'star_email': {
-                const resp = await fetch('/api/gmail/star', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emailId: a.emailId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'archive_email': {
-                const resp = await fetch('/api/gmail/archive', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ emailId: a.emailId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'update_calendar_event': {
-                const resp = await fetch('/api/calendar/update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(a),
-                });
-                return await safeJson(resp);
-            }
-            case 'delete_calendar_event': {
-                const resp = await fetch('/api/calendar/delete', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ eventId: a.eventId }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_news': {
-                const resp = await fetch('/api/news', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ category: a.category, country: a.country }),
-                });
-                return await safeJson(resp);
-            }
-            case 'convert_currency': {
-                const resp = await fetch('/api/currency', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ amount: a.amount, from: a.from, to: a.to }),
-                });
-                return await safeJson(resp);
-            }
-            case 'translate_text': {
-                const resp = await fetch('/api/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: a.text, targetLanguage: a.targetLang, sourceLanguage: a.sourceLang }),
-                });
-                return await safeJson(resp);
-            }
-            case 'set_timer': {
-                const resp = await fetch('/api/timer', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ duration: a.duration, label: a.label }),
-                });
-                return await safeJson(resp);
-            }
-            case 'create_note': {
-                const resp = await fetch('/api/notes', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ title: a.title, content: a.content }),
-                });
-                return await safeJson(resp);
-            }
-            case 'reply_to_email': {
-                const resp = await fetch(`/api/gmail/reply/${a.emailId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: a.text, html: a.html }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_email_by_id': {
-                const resp = await fetch(`/api/gmail/email/${a.emailId}`);
-                return await safeJson(resp);
-            }
-            case 'summarize_emails': {
-                const resp = await fetch('/api/gmail/summarize', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ maxResults: (a.maxResults as number | undefined) ?? 10 }),
-                });
-                return await safeJson(resp);
-            }
-            case 'search_images': {
-                const resp = await fetch('/api/search/images', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
-                });
-                return await safeJson(resp);
-            }
-            case 'search_videos': {
-                const resp = await fetch('/api/search/videos', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
-                });
-                return await safeJson(resp);
-            }
-            case 'get_factual_info': {
-                const resp = await fetch('/api/search/facts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: a.query }),
-                });
-                return await safeJson(resp);
-            }
-            case 'disconnect_session': {
-                // This is a client-side signal; the component using this hook 
-                // should listen for this call or we just return a special signal.
-                // In this architecture, returning a specific success message is enough
-                // for the model to know it "worked", but the actual disconnect
-                // needs to happen in the UI layer or via an event listener.
-                // For now, we will assume the model stops context.
-                return { success: true, message: 'Session disconnected' };
-            }
-            default:
-                return { error: `Unknown tool: ${name}` };
+        };
+
+        // Execute and log the result
+        let result: unknown;
+        let hasError = false;
+
+        try {
+            result = await executeTool();
+        } catch (err) {
+            hasError = true;
+            result = { error: err instanceof Error ? err.message : 'Unknown error' };
         }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // 📊 TOOL RESULT LOGGING
+        // ═══════════════════════════════════════════════════════════════════
+        const endTime = performance.now();
+        const duration = (endTime - startTime).toFixed(2);
+
+        if (hasError) {
+            console.log(`%c❌ TOOL FAILED: ${name}`, 'color: #ef4444; font-weight: bold');
+        } else {
+            console.log(`%c✅ TOOL SUCCESS: ${name}`, 'color: #22c55e; font-weight: bold');
+        }
+        console.log(`%c⏱️ Duration: ${duration}ms`, 'color: #94a3b8');
+        console.log(`%c📤 RESULT:`, 'color: #60a5fa; font-weight: bold');
+        console.log(result);
+        console.log(`%c══════════════════════════════════════════════════════════════\n`, 'color: #6ee7b7');
+
+        return result;
     }, []);
 
     const toolkitDefinitions = [
@@ -318,8 +360,9 @@ export const useToolkit = () => {
         { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
 
         // Gmail CRUD Operations
-        { type: 'function', name: 'get_emails', description: "ALWAYS CALL THIS FIRST to get emails. This is the ONLY way to retrieve email data. Returns real email IDs that can be used in other operations.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5 } } } },
-        { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query. Returns real email IDs.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number', default: 5 } }, required: ['query'] } },
+        { type: 'function', name: 'get_emails', description: "Gets email list with METADATA ONLY (subject, from, date, snippet). Does NOT return full email bodies. To read full email content, you MUST call get_email_by_id with the email's ID. NEVER describe email content without calling get_email_by_id first.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5 } } } },
+        { type: 'function', name: 'get_email_by_id', description: 'Gets the FULL content of a specific email including body text. REQUIRED when user asks to read/show/display an email. Use the emailId from get_emails result.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'Email ID from get_emails result, like 19b495ed68757ef4' } }, required: ['emailId'] } },
+        { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query. Returns METADATA only, not full bodies.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number', default: 5 } }, required: ['query'] } },
         { type: 'function', name: 'send_email', description: 'Sends a new email via Gmail.', parameters: { type: 'object', properties: { to: { type: 'string', description: 'Recipient email address' }, subject: { type: 'string', description: 'Email subject' }, text: { type: 'string', description: 'Email body text' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] } },
         { type: 'function', name: 'reply_to_email', description: 'Replies to an existing email. REQUIRES a real emailId from get_emails result.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'Must be a real ID from get_emails, like 19b495ed68757ef4' }, text: { type: 'string', description: 'Reply body text' } }, required: ['emailId', 'text'] } },
         { type: 'function', name: 'summarize_emails', description: 'Gets and summarizes recent emails. Call this when user wants email summary.', parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5 } } } },

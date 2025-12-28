@@ -170,8 +170,8 @@ class GmailService {
 
       const messagePromises = response.data.messages
         .slice(0, Math.min(maxResults, 50))
-        .map(message => this.getEmailById(message.id).catch(err => {
-          console.warn(`Failed to fetch email details for ${message.id}:`, err.message);
+        .map(message => this.getEmailMetadata(message.id).catch(err => {
+          console.warn(`Failed to fetch email metadata for ${message.id}:`, err.message);
           return null;
         }));
 
@@ -228,8 +228,8 @@ class GmailService {
 
       const searchPromises = response.data.messages
         .slice(0, maxResults)
-        .map(message => this.getEmailById(message.id).catch(err => {
-          console.warn(`Failed to fetch email details for search result ${message.id}:`, err.message);
+        .map(message => this.getEmailMetadata(message.id).catch(err => {
+          console.warn(`Failed to fetch email metadata for search result ${message.id}:`, err.message);
           return null;
         }));
 
@@ -313,6 +313,52 @@ class GmailService {
       }
       console.error('Failed to get email:', error);
       const err = new Error(`Failed to retrieve email details: ${error.message}`);
+      err.status = status || 500;
+      throw err;
+    }
+  }
+
+  // Get email METADATA ONLY (no body content) - for listing emails
+  async getEmailMetadata(emailId) {
+    if (!this.gmail) throw new Error('Gmail not authenticated');
+
+    try {
+      const email = await this.gmail.users.messages.get({
+        userId: 'me',
+        id: emailId,
+        format: 'metadata',
+        metadataHeaders: ['Subject', 'From', 'To', 'Date']
+      });
+
+      const headers = email.data.payload.headers;
+      const subject = headers.find(h => h.name === 'Subject')?.value || 'No Subject';
+      const from = headers.find(h => h.name === 'From')?.value || 'Unknown';
+      const to = headers.find(h => h.name === 'To')?.value || 'Unknown';
+      const date = headers.find(h => h.name === 'Date')?.value || '';
+
+      return {
+        id: emailId,
+        subject,
+        from,
+        to,
+        date,
+        snippet: email.data.snippet,
+        threadId: email.data.threadId,
+        labelIds: email.data.labelIds || [],
+        isRead: !email.data.labelIds?.includes('UNREAD'),
+        isStarred: email.data.labelIds?.includes('STARRED'),
+        isImportant: email.data.labelIds?.includes('IMPORTANT')
+        // NO body, NO htmlBody, NO attachments - metadata only!
+      };
+    } catch (error) {
+      const status = error.code || error.response?.status;
+      if (status === 404) {
+        const err = new Error(`Gmail API error: The email ID "${emailId}" was not found.`);
+        err.status = 404;
+        throw err;
+      }
+      console.error('Failed to get email metadata:', error);
+      const err = new Error(`Failed to retrieve email metadata: ${error.message}`);
       err.status = status || 500;
       throw err;
     }
