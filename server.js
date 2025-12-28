@@ -14,6 +14,8 @@ import { createUtilityRouter } from './backend/routes/utility.js';
 import { createSearchRouter } from './backend/routes/search.js';
 import { createChatRouter } from './backend/routes/chat.js';
 import { createAuthRouter } from './backend/routes/auth.js';
+import { createRimeRouter } from './backend/routes/rime.js';
+
 
 // Load environment variables
 dotenv.config();
@@ -46,6 +48,7 @@ const utilityRouter = createUtilityRouter(utilityService, gmailService);
 const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
 const authRouter = createAuthRouter();
+const rimeRouter = createRimeRouter();
 
 // Mount Routes
 app.use('/api/auth', authRouter);
@@ -55,6 +58,7 @@ app.use('/api/calendar', calendarRouter);
 app.use('/api', utilityRouter); // Mounts utility routes directly under /api (e.g. /api/weather)
 app.use('/api', searchRouter);  // Mounts search routes directly under /api (e.g. /api/search)
 app.use('/api/chat', chatRouter);
+app.use('/api/rime', rimeRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));

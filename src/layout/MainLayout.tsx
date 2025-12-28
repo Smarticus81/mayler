@@ -3,6 +3,7 @@ import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
 import { useWebRTC } from '../hooks/useWebRTC';
+import { useGreeting } from '../hooks/useGreeting';
 import { VoiceOrb } from '../components/VoiceOrb';
 import { TranscriptStream } from '../components/TranscriptStream';
 import { SettingsModal } from '../components/SettingsModal';
@@ -15,7 +16,8 @@ export const MainLayout: React.FC = () => {
     const pipeline = useWebRTC();
     const { connect, disconnect, remoteAudioElRef, audioLevel } = pipeline;
 
-    const { initAudioContext, playWakeChime, playGreeting } = useAudio();
+    const { initAudioContext, playWakeChime } = useAudio();
+    const { playGreeting, isReady } = useGreeting();
     const [isActive, setIsActive] = useState(false);
 
     const handleStart = () => {
@@ -28,11 +30,17 @@ export const MainLayout: React.FC = () => {
         () => {
             if (!isActive) return;
             console.log('Wake word detected! Connecting...');
-            connect();
+
+            // Play instant greeting IMMEDIATELY (no waiting for connection)
+            if (isReady) {
+                playGreeting();
+            }
+
+            // Connect in parallel (happens during greeting playback)
+            connect(false); // Don't send "Hey mayler" - already greeted
         },
         () => {
             playWakeChime();
-            playGreeting();
         },
         isActive && !connected
     );
