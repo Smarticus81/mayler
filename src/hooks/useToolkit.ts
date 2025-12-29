@@ -346,6 +346,22 @@ export const useToolkit = () => {
                     });
                     return await safeJson(resp);
                 }
+                case 'browse_url': {
+                    const resp = await fetch('/api/browsing/browse-url', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: a.url }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'extract_data': {
+                    const resp = await fetch('/api/browsing/extract-data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ url: a.url, selector: a.selector }),
+                    });
+                    return await safeJson(resp);
+                }
                 case 'search_videos': {
                     const resp = await fetch('/api/search/videos', {
                         method: 'POST',
@@ -439,6 +455,8 @@ export const useToolkit = () => {
 
         // Web & Information
         { type: 'function', name: 'web_search', description: 'Search the web for any information, news, or results.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
+        { type: 'function', name: 'browse_url', description: 'Fetches and extracts content from any URL. Returns title, description, main content, and links. Use this to read articles, documentation, or any web page.', parameters: { type: 'object', properties: { url: { type: 'string', description: 'The URL to browse and extract content from' } }, required: ['url'] } },
+        { type: 'function', name: 'extract_data', description: 'Extracts structured data from a web page (headings, paragraphs, lists). Can use CSS selectors for specific extraction.', parameters: { type: 'object', properties: { url: { type: 'string', description: 'The URL to extract data from' }, selector: { type: 'string', description: 'Optional CSS selector to extract specific elements' } }, required: ['url'] } },
 
         // Vision & Document Analysis
         { type: 'function', name: 'analyze_documents', description: 'Analyzes uploaded images or documents using GPT-5.2 vision. Can analyze screenshots, photos of documents, diagrams, spreadsheets, receipts, contracts, etc. Supports multiple images at once. User can show you documents via camera.', parameters: { type: 'object', properties: { images: { type: 'array', items: { type: 'string' }, description: 'Array of base64 encoded images to analyze' }, query: { type: 'string', description: 'What to analyze or extract. E.g., "Extract all text", "Summarize this document", "What are the key insights?", "Extract receipt total and items"' } }, required: ['images', 'query'] } },

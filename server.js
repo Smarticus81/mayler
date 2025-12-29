@@ -16,17 +16,16 @@ import { createChatRouter } from './backend/routes/chat.js';
 import { createAuthRouter } from './backend/routes/auth.js';
 import { createRimeRouter } from './backend/routes/rime.js';
 import { createVisionRouter } from './backend/routes/vision.js';
+import { createBrowsingRouter } from './backend/routes/browsing.js';
 
 
 // Load environment variables
 dotenv.config();
+console.log('[dotenv] Environment variables loaded');
 
 // ES module equivalent of __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 // Initialize services
 const gmailService = new GmailService();
@@ -38,19 +37,40 @@ gmailService.initialize().catch(err => console.error('Initial Gmail check failed
 
 console.log('Services loaded');
 
-// Enable CORS for all routes
-app.use(cors());
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Middleware
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  credentials: true,
+}));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Session configuration
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'mayler-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000
+  }
+}));
+
+// Initialize routers
 const tokenRouter = createTokenRouter();
 const gmailRouter = createGmailRouter(gmailService);
 const calendarRouter = createCalendarRouter(gmailService);
-const utilityRouter = createUtilityRouter(utilityService, gmailService);
+const utilityRouter = createCreateUtilityRouter(utilityService, gmailService);
 const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
 const authRouter = createAuthRouter();
 const rimeRouter = createRimeRouter();
 const visionRouter = createVisionRouter();
+const browsingRouter = createBrowsingRouter();
 
 // Mount Routes
 app.use('/api/auth', authRouter);
@@ -62,6 +82,7 @@ app.use('/api', searchRouter);  // Mounts search routes directly under /api (e.g
 app.use('/api/chat', chatRouter);
 app.use('/api/rime', rimeRouter);
 app.use('/api/vision', visionRouter);
+app.use('/api/browsing', browsingRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));
