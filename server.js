@@ -15,6 +15,7 @@ import { createSearchRouter } from './backend/routes/search.js';
 import { createChatRouter } from './backend/routes/chat.js';
 import { createAuthRouter } from './backend/routes/auth.js';
 import { createRimeRouter } from './backend/routes/rime.js';
+import { createVisionRouter } from './backend/routes/vision.js';
 
 
 // Load environment variables
@@ -49,6 +50,7 @@ const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
 const authRouter = createAuthRouter();
 const rimeRouter = createRimeRouter();
+const visionRouter = createVisionRouter();
 
 // Mount Routes
 app.use('/api/auth', authRouter);
@@ -59,6 +61,7 @@ app.use('/api', utilityRouter); // Mounts utility routes directly under /api (e.
 app.use('/api', searchRouter);  // Mounts search routes directly under /api (e.g. /api/search)
 app.use('/api/chat', chatRouter);
 app.use('/api/rime', rimeRouter);
+app.use('/api/vision', visionRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));

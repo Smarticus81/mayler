@@ -335,6 +335,17 @@ export const useToolkit = () => {
                     });
                     return await safeJson(resp);
                 }
+                case 'analyze_documents': {
+                    const resp = await fetch('/api/vision/analyze-documents', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            images: a.images,
+                            query: a.query
+                        }),
+                    });
+                    return await safeJson(resp);
+                }
                 case 'search_videos': {
                     const resp = await fetch('/api/search/videos', {
                         method: 'POST',
@@ -428,6 +439,10 @@ export const useToolkit = () => {
 
         // Web & Information
         { type: 'function', name: 'web_search', description: 'Search the web for any information, news, or results.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
+
+        // Vision & Document Analysis
+        { type: 'function', name: 'analyze_documents', description: 'Analyzes uploaded images or documents using GPT-5.2 vision. Can analyze screenshots, photos of documents, diagrams, spreadsheets, receipts, contracts, etc. Supports multiple images at once. User can show you documents via camera.', parameters: { type: 'object', properties: { images: { type: 'array', items: { type: 'string' }, description: 'Array of base64 encoded images to analyze' }, query: { type: 'string', description: 'What to analyze or extract. E.g., "Extract all text", "Summarize this document", "What are the key insights?", "Extract receipt total and items"' } }, required: ['images', 'query'] } },
+
         { type: 'function', name: 'get_factual_info', description: 'Retrieves factual information about a topic from Wikipedia or factual sources.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'The topic or question to look up' } }, required: ['query'] } },
         { type: 'function', name: 'search_images', description: 'Searches for images on the web.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
         { type: 'function', name: 'search_videos', description: 'Searches for videos on YouTube or the web.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },

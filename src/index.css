@@ -903,3 +903,233 @@ body {
     box-shadow: 0 0 15px rgba(168, 181, 160, 0.1);
   }
 }
+
+/* Camera Capture Modal */
+.camera-capture-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-capture-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.camera-capture-content {
+  position: relative;
+  background: var(--bg-tertiary);
+  border-radius: 24px;
+  width: 95%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow: hidden;
+  box-shadow: var(--shadow-strong);
+  display: flex;
+  flex-direction: column;
+}
+
+.camera-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.camera-header h3 {
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.close-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+  font-size: 20px;
+}
+
+.close-btn:hover {
+  background: var(--glass-highlight);
+  color: var(--text-primary);
+}
+
+.camera-start {
+  padding: 60px 24px;
+  display: flex;
+  justify-content: center;
+}
+
+.camera-view {
+  position: relative;
+  width: 100%;
+  background: #000;
+  aspect-ratio: 4/3;
+}
+
+.camera-view video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-controls {
+  display: flex;
+  gap: 12px;
+  padding: 20px 24px;
+  justify-content: center;
+  background: var(--bg-secondary);
+}
+
+.capture-btn {
+  padding: 14px 28px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+  box-shadow: var(--shadow-medium);
+}
+
+.capture-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-strong);
+}
+
+.secondary-btn {
+  padding: 14px 24px;
+  background: var(--glass-bg);
+  color: var(--text-primary);
+  border: none;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+}
+
+.secondary-btn:hover {
+  background: var(--glass-highlight);
+}
+
+.captures-preview {
+  padding: 24px;
+  border-top: 1px solid var(--glass-border);
+  background: var(--bg-secondary);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.captures-preview h4 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.captures-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.capture-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-soft);
+}
+
+.capture-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.remove-btn:hover {
+  background: var(--error);
+  transform: scale(1.1);
+}
+
+.analyze-btn {
+  width: 100%;
+  padding: 16px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s var(--ease-smooth);
+  box-shadow: var(--shadow-medium);
+}
+
+.analyze-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-strong);
+}
+
+/* Mobile Optimization */
+@media (max-width: 768px) {
+  .camera-capture-content {
+    width: 100%;
+    max-width: 100%;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .camera-view {
+    aspect-ratio: auto;
+    flex: 1;
+  }
+
+  .captures-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .capture-btn {
+    flex: 1;
+    font-size: 18px;
+    padding: 18px;
+  }
+}
