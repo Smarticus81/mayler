@@ -65,7 +65,7 @@ app.use(session({
 const tokenRouter = createTokenRouter();
 const gmailRouter = createGmailRouter(gmailService);
 const calendarRouter = createCalendarRouter(gmailService);
-const utilityRouter = createCreateUtilityRouter(utilityService, gmailService);
+const utilityRouter = createUtilityRouter(utilityService, gmailService);
 const searchRouter = createSearchRouter(searchService);
 const chatRouter = createChatRouter();
 const authRouter = createAuthRouter();
