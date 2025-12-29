@@ -1133,3 +1133,122 @@ body {
     padding: 18px;
   }
 }
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 400px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: var(--bg-tertiary);
+  border-radius: 16px;
+  box-shadow: var(--shadow-strong);
+  border-left: 4px solid;
+  animation: slideInRight 0.3s var(--ease-smooth);
+  cursor: pointer;
+  transition: all 0.2s var(--ease-smooth);
+}
+
+.toast:hover {
+  transform: translateX(-4px);
+  box-shadow: 0 16px 64px rgba(168, 181, 160, 0.2);
+}
+
+.toast-error {
+  border-left-color: var(--error);
+  background: linear-gradient(135deg, rgba(216, 168, 168, 0.1), var(--bg-tertiary));
+}
+
+.toast-success {
+  border-left-color: var(--success);
+  background: linear-gradient(135deg, rgba(168, 197, 160, 0.1), var(--bg-tertiary));
+}
+
+.toast-warning {
+  border-left-color: var(--warning);
+  background: linear-gradient(135deg, rgba(232, 212, 160, 0.1), var(--bg-tertiary));
+}
+
+.toast-info {
+  border-left-color: var(--primary);
+  background: linear-gradient(135deg, var(--primary-soft), var(--bg-tertiary));
+}
+
+.toast-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.toast-close {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.2s var(--ease-smooth);
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: var(--glass-bg);
+  color: var(--text-primary);
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Mobile Toast Styles */
+@media (max-width: 768px) {
+  .toast-container {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+
+  .toast {
+    padding: 14px 16px;
+  }
+
+  .toast-icon {
+    font-size: 20px;
+  }
+
+  .toast-message {
+    font-size: 13px;
+  }
+}
