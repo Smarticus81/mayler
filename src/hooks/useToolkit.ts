@@ -235,11 +235,7 @@ export const useToolkit = () => {
                         };
                     }
 
-                    // Allow IDs that were fetched (even if already used for get_email_by_id)
-                    // But block completely unknown IDs
-                    const wasEverValid = emailIdRegistry.current.validIds.has(emailId) ||
-                        emailIdRegistry.current.lastFetchTime > 0; // At least one fetch happened
-
+                    // Block if no emails have ever been fetched
                     if (emailIdRegistry.current.validIds.size === 0 && emailIdRegistry.current.lastFetchTime === 0) {
                         return {
                             error: 'NO_EMAILS_FETCHED',
