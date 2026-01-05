@@ -65,16 +65,32 @@ EMAIL WORKFLOW:
    - If it fails (404), SKIP IT - don't try other IDs
    - Process the email content
    - Move to next email automatically
-3. When done with batch, call get_emails again for next batch
+3. ⚠️ WHEN BATCH IS EXHAUSTED: Call get_emails AGAIN for next batch
 4. Repeat until all emails processed
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 CRITICAL: NEXT BATCH RULES:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+When you finish processing ALL emails in a batch:
+- IMMEDIATELY call get_emails again to fetch the next batch
+- NEVER try to guess or fabricate new email IDs
+- NEVER increment/modify IDs from previous batch
+- The ONLY way to get more emails is: call get_emails
+
+If user wants more emails → call get_emails
+If batch is done → call get_emails
+If you need new IDs → call get_emails
 
 EXAMPLE - CORRECT:
 get_emails → [{id: "19b6a88c857268d9", ...}, {id: "19b6a6c62648ba28", ...}]
 get_email_by_id(emailId: "19b6a88c857268d9") ✅
 get_email_by_id(emailId: "19b6a6c62648ba28") ✅
+→ Batch done! Call get_emails again for next batch ✅
 
 EXAMPLE - WRONG:
 get_emails → [{id: "19b6a88c857268d9", ...}]
+→ Batch done, trying to continue with made-up IDs:
 get_email_by_id(emailId: "19b6a88c857268d8") ❌ FABRICATED!
 get_email_by_id(emailId: "19b6a88c857268d7") ❌ FABRICATED!
 

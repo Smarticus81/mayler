@@ -1,7 +1,22 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { asObject, safeJson } from '../utils/jsonUtils';
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🛡️ EMAIL ID VALIDATION REGISTRY
+// Tracks valid email IDs returned by get_emails to prevent hallucination
+// ═══════════════════════════════════════════════════════════════════════════
+interface EmailIdRegistry {
+    validIds: Set<string>;
+    lastFetchTime: number;
+}
+
 export const useToolkit = () => {
+    // Strict registry of valid email IDs - ONLY IDs from get_emails are allowed
+    const emailIdRegistry = useRef<EmailIdRegistry>({
+        validIds: new Set(),
+        lastFetchTime: 0,
+    });
+
     const runTool = useCallback(async (name: string, args: unknown) => {
         const a = asObject(args) ?? {};
 
@@ -69,7 +84,25 @@ export const useToolkit = () => {
                 case 'get_emails': {
                     const maxResults = (a.maxResults as number | undefined) ?? 5;
                     const resp = await fetch(`/api/gmail/emails?maxResults=${encodeURIComponent(String(maxResults))}`);
-                    return await safeJson(resp);
+                    const data = await safeJson(resp);
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // 🛡️ STRICT: Clear old IDs and register ONLY new valid IDs
+                    // ═══════════════════════════════════════════════════════════════
+                    emailIdRegistry.current.validIds.clear();
+                    emailIdRegistry.current.lastFetchTime = Date.now();
+
+                    if (data && Array.isArray(data.emails)) {
+                        for (const email of data.emails) {
+                            if (email && typeof email.id === 'string') {
+                                emailIdRegistry.current.validIds.add(email.id);
+                            }
+                        }
+                        console.log(`%c🛡️ EMAIL ID REGISTRY: Registered ${emailIdRegistry.current.validIds.size} valid IDs`, 'color: #22d3ee; font-weight: bold');
+                        console.log(`%c   Valid IDs: ${Array.from(emailIdRegistry.current.validIds).join(', ')}`, 'color: #94a3b8');
+                    }
+
+                    return data;
                 }
                 case 'search_emails': {
                     const resp = await fetch('/api/gmail/search', {
@@ -77,7 +110,22 @@ export const useToolkit = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
                     });
-                    return await safeJson(resp);
+                    const data = await safeJson(resp);
+
+                    // 🛡️ STRICT: Register IDs from search results too
+                    if (data && Array.isArray(data.emails)) {
+                        // Clear and register new IDs (search replaces previous batch)
+                        emailIdRegistry.current.validIds.clear();
+                        emailIdRegistry.current.lastFetchTime = Date.now();
+                        for (const email of data.emails) {
+                            if (email && typeof email.id === 'string') {
+                                emailIdRegistry.current.validIds.add(email.id);
+                            }
+                        }
+                        console.log(`%c🛡️ EMAIL ID REGISTRY (search): Registered ${emailIdRegistry.current.validIds.size} valid IDs`, 'color: #22d3ee; font-weight: bold');
+                    }
+
+                    return data;
                 }
                 case 'send_email': {
                     const resp = await fetch('/api/gmail/send', {
@@ -171,43 +219,44 @@ export const useToolkit = () => {
                     });
                     return await safeJson(resp);
                 }
-                case 'delete_email': {
-                    const resp = await fetch('/api/gmail/delete', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ emailId: a.emailId }),
-                    });
-                    return await safeJson(resp);
-                }
-                case 'mark_email_read': {
-                    const resp = await fetch('/api/gmail/mark-read', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ emailId: a.emailId }),
-                    });
-                    return await safeJson(resp);
-                }
-                case 'mark_email_unread': {
-                    const resp = await fetch('/api/gmail/mark-unread', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ emailId: a.emailId }),
-                    });
-                    return await safeJson(resp);
-                }
-                case 'star_email': {
-                    const resp = await fetch('/api/gmail/star', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ emailId: a.emailId }),
-                    });
-                    return await safeJson(resp);
-                }
+                case 'delete_email':
+                case 'mark_email_read':
+                case 'mark_email_unread':
+                case 'star_email':
                 case 'archive_email': {
-                    const resp = await fetch('/api/gmail/archive', {
+                    const emailId = a.emailId as string;
+
+                    // 🛡️ STRICT: Validate email ID before any operation
+                    if (!emailId || typeof emailId !== 'string') {
+                        return {
+                            error: 'INVALID_REQUEST',
+                            message: 'No email ID provided. Call get_emails first.',
+                            action_required: 'Call get_emails to fetch emails and get valid IDs.'
+                        };
+                    }
+
+                    // Block if no emails have ever been fetched
+                    if (emailIdRegistry.current.validIds.size === 0 && emailIdRegistry.current.lastFetchTime === 0) {
+                        return {
+                            error: 'NO_EMAILS_FETCHED',
+                            message: 'You have not fetched any emails yet. Call get_emails FIRST.',
+                            action_required: 'Call get_emails to fetch the email list first.'
+                        };
+                    }
+
+                    // Map tool names to endpoints
+                    const endpointMap: Record<string, string> = {
+                        'delete_email': '/api/gmail/delete',
+                        'mark_email_read': '/api/gmail/mark-read',
+                        'mark_email_unread': '/api/gmail/mark-unread',
+                        'star_email': '/api/gmail/star',
+                        'archive_email': '/api/gmail/archive',
+                    };
+
+                    const resp = await fetch(endpointMap[name], {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ emailId: a.emailId }),
+                        body: JSON.stringify({ emailId }),
                     });
                     return await safeJson(resp);
                 }
@@ -244,7 +293,26 @@ export const useToolkit = () => {
                     return await safeJson(resp);
                 }
                 case 'forward_email': {
-                    const resp = await fetch(`/api/gmail/forward/${a.emailId}`, {
+                    const emailId = a.emailId as string;
+
+                    // 🛡️ STRICT: Validate email ID before forward
+                    if (!emailId || typeof emailId !== 'string') {
+                        return {
+                            error: 'INVALID_REQUEST',
+                            message: 'No email ID provided. Call get_emails first.',
+                            action_required: 'Call get_emails to fetch emails and get valid IDs.'
+                        };
+                    }
+
+                    if (emailIdRegistry.current.validIds.size === 0 && emailIdRegistry.current.lastFetchTime === 0) {
+                        return {
+                            error: 'NO_EMAILS_FETCHED',
+                            message: 'You have not fetched any emails yet. Call get_emails FIRST.',
+                            action_required: 'Call get_emails to fetch the email list first.'
+                        };
+                    }
+
+                    const resp = await fetch(`/api/gmail/forward/${emailId}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ to: a.to, text: a.text }),
@@ -316,8 +384,56 @@ export const useToolkit = () => {
                     return await safeJson(resp);
                 }
                 case 'get_email_by_id': {
-                    const resp = await fetch(`/api/gmail/email/${a.emailId}`);
-                    return await safeJson(resp);
+                    const emailId = a.emailId as string;
+
+                    // ═══════════════════════════════════════════════════════════════
+                    // 🛡️ STRICT VALIDATION: Block ALL fabricated/unknown email IDs
+                    // ═══════════════════════════════════════════════════════════════
+                    if (!emailId || typeof emailId !== 'string') {
+                        console.log(`%c🚫 BLOCKED: No email ID provided`, 'color: #ef4444; font-weight: bold');
+                        return {
+                            error: 'INVALID_REQUEST',
+                            message: 'No email ID provided. You MUST call get_emails first to get valid IDs.',
+                            action_required: 'Call get_emails to fetch emails and get valid IDs.'
+                        };
+                    }
+
+                    // Check if this ID was returned by get_emails
+                    if (!emailIdRegistry.current.validIds.has(emailId)) {
+                        console.log(`%c🚫 BLOCKED FABRICATED ID: "${emailId}"`, 'color: #ef4444; font-weight: bold; font-size: 14px');
+                        console.log(`%c   Valid IDs in registry: ${Array.from(emailIdRegistry.current.validIds).join(', ') || '(empty - call get_emails first!)'}`, 'color: #fbbf24');
+
+                        // Check if registry is empty (never called get_emails)
+                        if (emailIdRegistry.current.validIds.size === 0) {
+                            return {
+                                error: 'NO_EMAILS_FETCHED',
+                                message: 'You have not fetched any emails yet. You MUST call get_emails FIRST before calling get_email_by_id.',
+                                action_required: 'Call get_emails to fetch the email list, then use IDs from that response.',
+                                hint: 'The get_emails function returns a list of emails with their IDs. Use those exact IDs.'
+                            };
+                        }
+
+                        // Registry has IDs but this one isn't in it = fabricated
+                        return {
+                            error: 'FABRICATED_EMAIL_ID',
+                            message: `The email ID "${emailId}" was NOT returned by get_emails. This ID appears to be fabricated or hallucinated.`,
+                            action_required: 'You MUST call get_emails AGAIN to fetch the next batch of emails. Do NOT guess or modify IDs.',
+                            valid_ids_hint: `Current valid IDs: ${Array.from(emailIdRegistry.current.validIds).slice(0, 3).join(', ')}${emailIdRegistry.current.validIds.size > 3 ? '...' : ''}`,
+                            reminder: 'To get MORE emails, call get_emails again. Never fabricate IDs.'
+                        };
+                    }
+
+                    // ID is valid - proceed with the API call
+                    console.log(`%c✅ VALID EMAIL ID: "${emailId}"`, 'color: #22c55e; font-weight: bold');
+                    const resp = await fetch(`/api/gmail/email/${emailId}`);
+                    const data = await safeJson(resp);
+
+                    // After successfully fetching, remove from registry (one-time use)
+                    // This prevents re-using old IDs and forces fetching new batches
+                    emailIdRegistry.current.validIds.delete(emailId);
+                    console.log(`%c🗑️ Removed used ID from registry. Remaining: ${emailIdRegistry.current.validIds.size}`, 'color: #94a3b8');
+
+                    return data;
                 }
                 case 'summarize_emails': {
                     const resp = await fetch('/api/gmail/summarize', {
@@ -427,7 +543,7 @@ export const useToolkit = () => {
         { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
 
         // Gmail CRUD Operations
-        { type: 'function', name: 'get_emails', description: "Gets email list with METADATA ONLY. Returns array of emails, each with: id (string), subject, from, date, snippet. Does NOT return full bodies. IMPORTANT: Use the 'id' field from this response to call get_email_by_id. Example response: {emails: [{id: '19b6a88c857268d9', subject: 'Hello', from: 'user@example.com', ...}]}. NEVER guess or fabricate IDs - only use IDs from this response.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5 } } } },
+        { type: 'function', name: 'get_emails', description: "Gets email list with METADATA ONLY. Returns array of emails, each with: id (string), subject, from, date, snippet. Does NOT return full bodies. IMPORTANT: Use the 'id' field from this response to call get_email_by_id. CRITICAL: When you finish processing all emails in a batch, you MUST call get_emails AGAIN to fetch the next batch. NEVER fabricate or guess email IDs - the ONLY way to get more email IDs is to call this function again. Example: after processing 5 emails, call get_emails to get the next 5.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5, description: 'Number of emails to fetch. Call again to get next batch.' } } } },
         { type: 'function', name: 'get_email_by_id', description: 'Gets FULL email content by ID. CRITICAL: Only use email IDs from get_emails response. The ID must be the exact string from the "id" field in get_emails. NEVER guess or modify IDs.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'EXACT email ID from get_emails response (e.g., "19b6a88c857268d9")' } }, required: ['emailId'] } },
         { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query. Returns METADATA only, not full bodies.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number', default: 5 } }, required: ['query'] } },
         { type: 'function', name: 'send_email', description: 'DEPRECATED - Use create_draft instead. This tool is disabled for safety.', parameters: { type: 'object', properties: {} } },
