@@ -30,6 +30,12 @@ export const useWebRTC = () => {
     const shouldGreetOnConnectRef = useRef<boolean>(false);
     const [audioLevel, setAudioLevel] = useState(0);
 
+    // Use a ref to track speaking state for the dc.onmessage closure.
+    // State variables captured in the closure become stale since connect()
+    // only runs once, but the onmessage handler persists for the session.
+    const speakingRef = useRef(false);
+    speakingRef.current = speaking;
+
     const sendEvent = useCallback((event: JSONObject) => {
         if (!dcRef.current || dcRef.current.readyState !== 'open') return;
         dcRef.current.send(JSON.stringify(event));
@@ -103,6 +109,15 @@ COMPOSING EMAILS:
 - Tell user "I've created a draft for you to review"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LANGUAGE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+- ALWAYS respond in English only
+- NEVER switch languages mid-response
+- Even if user speaks another language, respond in English
+- Maintain consistent English throughout the entire session
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 PERSONALITY:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -125,13 +140,15 @@ TERMINATION:
                     type: 'server_vad',
                     threshold: 0.5,
                     prefix_padding_ms: 300,
-                    silence_duration_ms: 400,
+                    silence_duration_ms: 800,
                 },
+                temperature: 0.8,
+                max_response_output_tokens: 4096,
                 voice: selectedVoice,
                 tools: toolkitDefinitions,
             },
         });
-    }, [sendEvent, selectedVoice, toolkitDefinitions, voiceEngine]);
+    }, [sendEvent, selectedVoice, toolkitDefinitions]);
 
     const disconnect = useCallback(() => {
         dcRef.current?.close();
@@ -289,7 +306,7 @@ TERMINATION:
                 }
 
                 if (t === 'input_audio_buffer.speech_started') {
-                    if (speaking) sendEvent({ type: 'response.cancel' });
+                    if (speakingRef.current) sendEvent({ type: 'response.cancel' });
                     setListening(true);
                 }
                 if (t === 'input_audio_buffer.speech_stopped') {
@@ -393,7 +410,7 @@ TERMINATION:
             setError(e.message || 'Failed to connect');
             setLoading(false);
         }
-    }, [setConnected, setLoading, setError, configureSession, sendEvent, setSpeaking, setListening, setAgentInterimTranscript, setAgentTranscript, setInterimTranscript, setTranscript, speaking, handleFunctionCall]);
+    }, [setConnected, setLoading, setError, configureSession, sendEvent, setSpeaking, setListening, setAgentInterimTranscript, setAgentTranscript, setInterimTranscript, setTranscript, handleFunctionCall, disconnect, setIsWakeMode]);
 
 
 

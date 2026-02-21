@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { asObject, safeJson } from '../utils/jsonUtils';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -339,7 +339,7 @@ export const useToolkit = () => {
                     const resp = await fetch('/api/news', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ category: a.category, country: a.country }),
+                        body: JSON.stringify({ category: a.topic, maxResults: a.maxResults }),
                     });
                     return await safeJson(resp);
                 }
@@ -538,7 +538,7 @@ export const useToolkit = () => {
         return result;
     }, []);
 
-    const toolkitDefinitions = [
+    const toolkitDefinitions = useMemo(() => [
         // Google OAuth
         { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
 
@@ -600,7 +600,7 @@ export const useToolkit = () => {
         { type: 'function', name: 'get_crypto_price', description: 'Gets current cryptocurrency price.', parameters: { type: 'object', properties: { symbol: { type: 'string' }, currency: { type: 'string' } }, required: ['symbol'] } },
         // System
         { type: 'function', name: 'disconnect_session', description: 'Disconnects and ends the current voice session immediately.', parameters: { type: 'object', properties: {} } },
-    ];
+    ], []);
 
     return {
         runTool,
