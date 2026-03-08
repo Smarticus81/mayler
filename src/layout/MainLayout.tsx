@@ -10,9 +10,8 @@ import { SettingsModal } from '../components/SettingsModal';
 import { BrandHeader } from '../components/BrandHeader';
 
 export const MainLayout: React.FC = () => {
-    const { connected, setShowSettings, error } = useMayler();
+    const { connected, setShowSettings, error, loading } = useMayler();
 
-    // Use WebRTC pipeline
     const pipeline = useWebRTC();
     const { connect, disconnect, remoteAudioElRef, audioLevel } = pipeline;
 
@@ -25,19 +24,14 @@ export const MainLayout: React.FC = () => {
         setIsActive(true);
     };
 
-    // Initialize wake word detection and start detection only when active
     useWakeWord(
         () => {
             if (!isActive) return;
             console.log('Wake word detected! Connecting...');
-
-            // Play instant greeting IMMEDIATELY (no waiting for connection)
             if (isReady) {
                 playGreeting();
             }
-
-            // Connect in parallel (happens during greeting playback)
-            connect(false); // Don't send "Hey mayler" - already greeted
+            connect(false);
         },
         () => {
             playWakeChime();
@@ -54,7 +48,7 @@ export const MainLayout: React.FC = () => {
 
             <div className="status-bar">
                 <div style={{ flex: 1 }} />
-                <button className="settings-btn" onClick={() => setShowSettings(true)}>
+                <button className="settings-btn" onClick={() => setShowSettings(true)} aria-label="Settings">
                     <svg viewBox="0 0 24 24" width="20" height="20">
                         <path fill="currentColor" d="M12 15.5A3.5 3.5 0 0 1 8.5 12A3.5 3.5 0 0 1 12 8.5A3.5 3.5 0 0 1 15.5 12A3.5 3.5 0 0 1 12 15.5M19.43 12.97c0-.32.07-.66.07-1.03s-.07-.71-.07-1.03l2.11-1.63c.18-.15.24-.41.12-.61l-2-3.46c-.12-.22-.39-.29-.61-.22l-2.49 1c-.52-.39-1.06-.73-1.69-.98l-.37-2.65A.506.506 0 0 0 14 1h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.63.25-1.17.59-1.69.98l-2.49-1c-.22-.07-.49 0-.61.22l-2 3.46c-.12.2-.06.46.12.61l2.11 1.63c-.04.32-.07.65-.07 1.03s.03.71.07 1.03l-2.11 1.63c-.18.15-.24.41-.12.61l2 3.46c.12.22.39.29.61.22l2.49-1c.52.39 1.06.73 1.69.98l.37 2.65c.04.24.25.42.5.42h4c.25 0 .46-.18.5-.42l.37-2.65c.63-.25 1.17-.59 1.69-.98l2.49 1c.22.07.49 0 .61-.22l2-3.46c.12-.2.06-.46-.12-.61l-2.11-1.63Z" />
                     </svg>
@@ -78,9 +72,15 @@ export const MainLayout: React.FC = () => {
                     </div>
                 )}
 
-                {isActive && !connected && (
+                {isActive && !connected && !loading && (
                     <div className="status-hint">
                         Say "Hey Mayler" to start
+                    </div>
+                )}
+
+                {loading && (
+                    <div className="status-hint">
+                        Connecting...
                     </div>
                 )}
             </main>
@@ -89,7 +89,7 @@ export const MainLayout: React.FC = () => {
 
             {connected && (
                 <div className="controls">
-                    <button className="primary-btn pulse" onClick={disconnect}>
+                    <button className="primary-btn disconnect" onClick={disconnect}>
                         Disconnect
                     </button>
                 </div>

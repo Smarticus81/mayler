@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
-import type { GoogleStatus, VoiceOption, VoiceEngine } from '../types';
+import type { GoogleStatus, VoiceOption, VoiceEngine, ThemeMode, ChatMessage } from '../types';
 
 interface MaylerContextType {
     // Connection State
@@ -29,6 +29,11 @@ interface MaylerContextType {
     agentInterimTranscript: string;
     setAgentInterimTranscript: Dispatch<SetStateAction<string>>;
 
+    // Chat History
+    chatHistory: ChatMessage[];
+    addChatMessage: (type: ChatMessage['type'], text: string) => void;
+    clearChatHistory: () => void;
+
     // User Preferences / Settings
     wakeWordEnabled: boolean;
     setWakeWordEnabled: Dispatch<SetStateAction<boolean>>;
@@ -39,6 +44,10 @@ interface MaylerContextType {
     voiceEngine: VoiceEngine;
     setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
 
+    // Theme
+    themeMode: ThemeMode;
+    setThemeMode: Dispatch<SetStateAction<ThemeMode>>;
+    resolvedTheme: 'light' | 'dark';
 
     showSettings: boolean;
     setShowSettings: Dispatch<SetStateAction<boolean>>;
@@ -60,24 +69,70 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [agentTranscript, setAgentTranscript] = useState('');
     const [agentInterimTranscript, setAgentInterimTranscript] = useState('');
 
+    // Chat history for transcript display
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+
+    const addChatMessage = useCallback((type: ChatMessage['type'], text: string) => {
+        if (!text.trim()) return;
+        setChatHistory(prev => {
+            const newMsg: ChatMessage = {
+                id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                type,
+                text: text.trim(),
+                timestamp: Date.now(),
+            };
+            const updated = [...prev, newMsg];
+            return updated.length > 50 ? updated.slice(-50) : updated;
+        });
+    }, []);
+
+    const clearChatHistory = useCallback(() => {
+        setChatHistory([]);
+    }, []);
+
     const [wakeWordEnabled, setWakeWordEnabled] = useState(() => {
         const stored = localStorage.getItem('mayler_wake_word');
-        return stored !== 'false'; // default true
+        return stored !== 'false';
     });
     const [googleStatus, setGoogleStatus] = useState<GoogleStatus>('unknown');
     const [selectedVoice, setSelectedVoice] = useState<VoiceOption>(() => {
-        const supportedVoices: VoiceOption[] = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
+        const supportedVoices: VoiceOption[] = ['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'onyx', 'nova', 'sage', 'shimmer', 'verse', 'marin', 'cedar'];
         const stored = localStorage.getItem('mayler_voice');
         if (stored && supportedVoices.includes(stored as VoiceOption)) {
             return stored as VoiceOption;
         }
-        return 'alloy';
+        return 'ash';
     });
     const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
         const stored = localStorage.getItem('mayler_engine');
         return (stored as VoiceEngine) || 'openai';
     });
 
+    // Theme
+    const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+        const stored = localStorage.getItem('mayler_theme');
+        return (stored as ThemeMode) || 'system';
+    });
+
+    const [systemPrefersDark, setSystemPrefersDark] = useState(() =>
+        window.matchMedia('(prefers-color-scheme: dark)').matches
+    );
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+        mq.addEventListener('change', handler);
+        return () => mq.removeEventListener('change', handler);
+    }, []);
+
+    const resolvedTheme: 'light' | 'dark' = themeMode === 'system'
+        ? (systemPrefersDark ? 'dark' : 'light')
+        : themeMode;
+
+    // Apply theme to document
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', resolvedTheme);
+    }, [resolvedTheme]);
 
     const [showSettings, setShowSettings] = useState(false);
 
@@ -94,7 +149,9 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         localStorage.setItem('mayler_engine', voiceEngine);
     }, [voiceEngine]);
 
-
+    useEffect(() => {
+        localStorage.setItem('mayler_theme', themeMode);
+    }, [themeMode]);
 
     const value = {
         connected, setConnected,
@@ -107,12 +164,13 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         interimTranscript, setInterimTranscript,
         agentTranscript, setAgentTranscript,
         agentInterimTranscript, setAgentInterimTranscript,
+        chatHistory, addChatMessage, clearChatHistory,
         wakeWordEnabled, setWakeWordEnabled,
         googleStatus, setGoogleStatus,
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
-
-
+        themeMode, setThemeMode,
+        resolvedTheme,
         showSettings, setShowSettings,
     };
 

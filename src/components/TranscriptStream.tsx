@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { cleanText } from '../utils/stringUtils';
 
@@ -9,11 +9,19 @@ export const TranscriptStream: React.FC = () => {
         agentTranscript,
         agentInterimTranscript,
         connected,
+        speaking,
+        chatHistory,
     } = useMayler();
 
-    // Determine the "current" message to display
-    // Priority: Interim (User/Agent) > Final (Agent) > Final (User)
-    let activeMessage: { text: string; source: 'user' | 'agent' | 'system'; isInterim: boolean } | null = null;
+    const historyEndRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll chat history to bottom
+    useEffect(() => {
+        historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatHistory.length]);
+
+    // Current active message
+    let activeMessage: { text: string; source: 'user' | 'agent'; isInterim: boolean } | null = null;
 
     if (agentInterimTranscript) {
         activeMessage = { text: agentInterimTranscript, source: 'agent', isInterim: true };
@@ -29,16 +37,35 @@ export const TranscriptStream: React.FC = () => {
 
     return (
         <div className="transcript-area">
-            {/* We only render the active message. The CSS transitions handle the 'pop' effect if we key it properly, 
-                 but for a simple fix to prevent overlap, we ensure only one div is 'active' at a time.
-                 To enable true cross-fading, we would need a transition group, but CSS absolute positioning + opacity 
-                 switching works well for 'zen' minimalism. */}
-
-            {activeMessage && (
-                <div key="active-message" className={`transcript active ${activeMessage.source} ${activeMessage.isInterim ? 'interim' : ''}`}>
-                    <span className="transcript-text">{cleanText(activeMessage.text)}</span>
+            {/* Chat history bubbles */}
+            {chatHistory.length > 0 && (
+                <div className="chat-history">
+                    {chatHistory.slice(-12).map((msg) => (
+                        <div key={msg.id} className={`chat-bubble ${msg.type}`}>
+                            {cleanText(msg.text)}
+                        </div>
+                    ))}
+                    <div ref={historyEndRef} />
                 </div>
             )}
+
+            {/* Current active transcript */}
+            <div className="transcript-current">
+                {activeMessage && (
+                    <div className={`transcript active ${activeMessage.source} ${activeMessage.isInterim ? 'interim' : ''}`}>
+                        <span className="transcript-text">{cleanText(activeMessage.text)}</span>
+                    </div>
+                )}
+
+                {/* Typing indicator when agent is processing */}
+                {speaking && !agentInterimTranscript && !agentTranscript && (
+                    <div className="typing-indicator">
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                        <div className="typing-dot" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

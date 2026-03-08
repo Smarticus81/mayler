@@ -12,8 +12,8 @@ export const createTokenRouter = () => {
             throw err;
         }
 
-        const model = 'gpt-4o-realtime-preview';
-        const voice = process.env.OPENAI_VOICE || 'verse';
+        const model = 'gpt-4o-mini-realtime-preview';
+        const voice = process.env.OPENAI_VOICE || 'ash';
 
         const sessionConfig = {
             model,

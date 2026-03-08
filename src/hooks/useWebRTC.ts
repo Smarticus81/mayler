@@ -16,8 +16,8 @@ export const useWebRTC = () => {
         setAgentTranscript,
         setAgentInterimTranscript,
         selectedVoice,
-        voiceEngine,
         setIsWakeMode,
+        addChatMessage,
     } = useMayler();
 
     const { runTool, toolkitDefinitions } = useToolkit();
@@ -135,7 +135,7 @@ TERMINATION:
 - "goodbye"/"bye" → Say farewell and STOP
 - "shut down"/"stop listening" → Say "Shutting down" and STOP`,
                 modalities: modalities,
-                input_audio_transcription: { model: 'gpt-4o-mini-transcribe' },
+                input_audio_transcription: { model: 'gpt-4o-transcribe' },
                 turn_detection: {
                     type: 'server_vad',
                     threshold: 0.5,
@@ -211,7 +211,7 @@ TERMINATION:
             console.log('[WebRTC] Token Response:', tokenData);
 
             let token: string | null = null;
-            let modelName = 'gpt-4o-realtime-preview'; // fallback
+            let modelName = 'gpt-4o-mini-realtime-preview'; // fallback
 
             if (tokenData) {
                 const clientSecret = asObject(tokenData.client_secret);
@@ -329,6 +329,7 @@ TERMINATION:
                     if (text.trim()) {
                         setAgentTranscript(text);
                         setAgentInterimTranscript('');
+                        addChatMessage('agent', text);
 
                         // Check for termination phrases
                         const lowerText = text.toLowerCase();
@@ -357,8 +358,10 @@ TERMINATION:
                     setInterimTranscript(prev => prev + (asString(msg.delta) || ''));
                 }
                 if (t === 'input_audio_transcription.completed') {
-                    setTranscript(asString(msg.transcript) || '');
+                    const userText = asString(msg.transcript) || '';
+                    setTranscript(userText);
                     setInterimTranscript('');
+                    if (userText.trim()) addChatMessage('user', userText);
                 }
 
                 if (t === 'response.output_item.done') {
