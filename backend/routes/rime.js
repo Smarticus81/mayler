@@ -24,10 +24,11 @@ export const createRimeRouter = () => {
             console.log(`🎙️ Voice: ${voice}`);
 
             const mp3 = await openai.audio.speech.create({
-                model: "tts-1",
+                model: "tts-1-hd",
                 voice: voice,
                 input: text,
-                speed: 1.1, // Slightly faster for urgency
+                speed: 1.05,
+                response_format: "mp3",
             });
 
             const buffer = Buffer.from(await mp3.arrayBuffer());
