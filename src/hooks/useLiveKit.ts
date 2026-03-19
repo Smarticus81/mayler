@@ -30,7 +30,6 @@ export const useLiveKit = () => {
         setInterimTranscript,
         setAgentTranscript,
         setAgentInterimTranscript,
-        setIsWakeMode,
         addChatMessage,
     } = useMayler();
 
@@ -65,7 +64,7 @@ export const useLiveKit = () => {
      * Uses the LiveKit signaling protocol via WebSocket, then establishes
      * a peer connection for audio/video streaming.
      */
-    const connect = useCallback(async (shouldGreet = false) => {
+    const connect = useCallback(async (_shouldGreet = false) => {
         setLoading(true);
         setError('');
 
