@@ -19,7 +19,14 @@ export const MainLayout: React.FC = () => {
 
     const isLiveKit = voicePipeline === 'livekit-cloud';
     const activePipeline = isLiveKit ? livekitPipeline : openaiPipeline;
-    const { connect, disconnect, remoteAudioElRef, audioLevel } = activePipeline;
+    const { connect, disconnect, audioLevel } = activePipeline;
+
+    // Use a stable audio ref shared across both pipelines
+    const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
+    useEffect(() => {
+        openaiPipeline.remoteAudioElRef.current = sharedAudioRef.current;
+        livekitPipeline.remoteAudioElRef.current = sharedAudioRef.current;
+    });
 
     const { initAudioContext, playWakeChime } = useAudio();
     const { playGreeting, isReady } = useGreeting();
@@ -47,7 +54,7 @@ export const MainLayout: React.FC = () => {
             if (isReady) {
                 playGreeting();
             }
-            connect(false);
+            connect(true);
         },
         () => {
             playWakeChime();
@@ -60,7 +67,7 @@ export const MainLayout: React.FC = () => {
             <div className="ambient-bg" />
             <div className="glass-overlay" />
 
-            <audio ref={remoteAudioElRef} autoPlay />
+            <audio ref={sharedAudioRef} autoPlay />
 
             <div className="status-bar">
                 {connected && isLiveKit && (
