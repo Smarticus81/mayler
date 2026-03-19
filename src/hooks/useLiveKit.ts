@@ -22,6 +22,9 @@ import type {
 } from 'livekit-client';
 import { useMayler } from '../context/MaylerContext';
 
+/** Seconds to wait for an agent to join before falling back to OpenAI */
+const AGENT_JOIN_TIMEOUT = 8;
+
 interface LiveKitConnection {
     token: string;
     wsUrl: string;
@@ -41,9 +44,12 @@ export const useLiveKit = () => {
         setAgentTranscript,
         setAgentInterimTranscript,
         addChatMessage,
+        setVoicePipeline,
     } = useMayler();
 
     const roomRef = useRef<Room | null>(null);
+    const agentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const agentJoinedRef = useRef(false);
     const remoteAudioElRef = useRef<HTMLAudioElement | null>(null);
     const [audioLevel, setAudioLevel] = useState(0);
     const [lkConnected, setLkConnected] = useState(false);
@@ -199,9 +205,48 @@ export const useLiveKit = () => {
                 setLkConnected(false);
             });
 
+            // Detect when agent joins
+            agentJoinedRef.current = false;
+            room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+                console.log(`[LiveKit] Participant joined: ${participant.identity}`);
+                if (participant.identity?.includes('agent') || participant.name?.includes('mayler')) {
+                    agentJoinedRef.current = true;
+                    if (agentTimerRef.current) {
+                        clearTimeout(agentTimerRef.current);
+                        agentTimerRef.current = null;
+                    }
+                    console.log('[LiveKit] Agent joined the room');
+                }
+            });
+
             // Connect to the room and publish microphone
             await room.connect(wsUrl, token);
             console.log('[LiveKit] Connected to room');
+
+            // Check if agent is already in the room
+            for (const [, p] of room.remoteParticipants) {
+                if (p.identity?.includes('agent') || p.name?.includes('mayler')) {
+                    agentJoinedRef.current = true;
+                    console.log('[LiveKit] Agent already in room');
+                    break;
+                }
+            }
+
+            // Start agent join timeout — fall back to OpenAI if no agent appears
+            if (!agentJoinedRef.current) {
+                agentTimerRef.current = setTimeout(() => {
+                    if (!agentJoinedRef.current && roomRef.current) {
+                        console.warn(`[LiveKit] No agent joined within ${AGENT_JOIN_TIMEOUT}s — falling back to OpenAI WebRTC`);
+                        roomRef.current.disconnect();
+                        roomRef.current = null;
+                        setConnected(false);
+                        setLkConnected(false);
+                        setLoading(false);
+                        setError('LiveKit agent unavailable — switching to OpenAI pipeline');
+                        setVoicePipeline('openai-webrtc');
+                    }
+                }, AGENT_JOIN_TIMEOUT * 1000);
+            }
 
             await room.localParticipant.setMicrophoneEnabled(true);
             console.log('[LiveKit] Microphone enabled');
@@ -218,6 +263,10 @@ export const useLiveKit = () => {
      * Disconnect from LiveKit room.
      */
     const disconnect = useCallback(() => {
+        if (agentTimerRef.current) {
+            clearTimeout(agentTimerRef.current);
+            agentTimerRef.current = null;
+        }
         roomRef.current?.disconnect();
         roomRef.current = null;
         setConnected(false);

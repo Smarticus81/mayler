@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
@@ -24,6 +24,16 @@ export const MainLayout: React.FC = () => {
     const { initAudioContext, playWakeChime } = useAudio();
     const { playGreeting, isReady } = useGreeting();
     const [isActive, setIsActive] = useState(false);
+
+    // Auto-connect via OpenAI when LiveKit falls back
+    const prevPipelineRef = useRef(voicePipeline);
+    useEffect(() => {
+        if (prevPipelineRef.current === 'livekit-cloud' && voicePipeline === 'openai-webrtc' && isActive && !connected) {
+            console.log('[Fallback] LiveKit → OpenAI WebRTC, auto-connecting...');
+            openaiPipeline.connect(true);
+        }
+        prevPipelineRef.current = voicePipeline;
+    }, [voicePipeline, isActive, connected, openaiPipeline]);
 
     const handleStart = () => {
         initAudioContext();
