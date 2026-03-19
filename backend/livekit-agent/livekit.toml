@@ -1,11 +1,22 @@
 [agent]
 name = "mayler-voice-agent"
-version = "1.0.0"
+version = "2.0.0"
 
 [agent.build]
 dockerfile = "Dockerfile"
 context = "."
 
 [agent.runtime]
-# Environment variables are inherited from LiveKit Cloud project settings
-# or from the .env file when running locally
+# Environment variables required (set in Railway or LiveKit Cloud):
+# LIVEKIT_URL - wss://your-project.livekit.cloud
+# LIVEKIT_API_KEY - your LiveKit API key
+# LIVEKIT_API_SECRET - your LiveKit API secret
+# OPENAI_API_KEY - for LLM and TTS
+# DEEPGRAM_API_KEY - for STT (if using Deepgram)
+# CARTESIA_API_KEY - for TTS (if using Cartesia)
+# MAYLER_BACKEND_URL - URL of the main Mayler Node.js backend
+# LIVEKIT_PIPELINE_MODE - "pipeline" (default) or "realtime"
+# LIVEKIT_STT_PROVIDER - "deepgram" (default) or "openai"
+# LIVEKIT_TTS_PROVIDER - "cartesia" (default), "elevenlabs", or "openai"
+# LIVEKIT_TTS_VOICE - voice ID for the chosen TTS provider
+# LIVEKIT_LLM_MODEL - LLM model string (default: "openai/gpt-4.1-mini")

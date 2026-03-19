@@ -8,7 +8,7 @@ import os
 import json
 import logging
 import aiohttp
-from livekit.agents import function_tool
+from livekit.agents.llm import function_tool
 
 logger = logging.getLogger("mayler-tools")
 

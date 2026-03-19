@@ -3,18 +3,31 @@ Mayler LiveKit Voice Agent — Production-grade voice AI with adaptive
 interruption detection, low-latency pipeline, multi-modal capabilities,
 and extensive tool access.
 
-Run:  python agent.py dev       (development)
-      python agent.py start     (production)
+Run:  python agent.py console    (local testing)
+      python agent.py dev        (development with hot-reload)
+      python agent.py start      (production)
 """
 
 import logging
 import os
-from dotenv import load_dotenv
 
-from livekit import agents
-from livekit.agents import AgentSession, Agent, RoomInputOptions
+from dotenv import load_dotenv
+from livekit.agents import (
+    Agent,
+    AgentServer,
+    AgentSession,
+    JobContext,
+    JobProcess,
+    RunContext,
+    TurnHandlingOptions,
+    cli,
+    inference,
+    metrics,
+)
+from livekit.agents.llm import function_tool
 from livekit.agents.voice import MetricsCollectedEvent
-from livekit.plugins import openai, silero, deepgram, cartesia
+from livekit.plugins import silero
+from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from tools import ALL_TOOLS
 
@@ -81,138 +94,121 @@ TERMINATION:
 
 
 # ──────────────────────────────────────────────────────────────
-# Pipeline Configuration
+# Mayler Agent class with on_enter greeting
 # ──────────────────────────────────────────────────────────────
 
-def _build_stt():
-    """Select STT provider based on env config."""
-    provider = os.getenv("LIVEKIT_STT_PROVIDER", "deepgram")
-    if provider == "deepgram":
-        return deepgram.STT(
-            model="nova-3",
-            language="en",
+class MaylerAgent(Agent):
+    def __init__(self) -> None:
+        super().__init__(
+            instructions=MAYLER_INSTRUCTIONS,
+            tools=ALL_TOOLS,
         )
-    return openai.STT(model="gpt-4o-transcribe")
 
-
-def _build_llm():
-    """Select LLM provider."""
-    model = os.getenv("LIVEKIT_LLM_MODEL", "gpt-4o")
-    return openai.LLM(model=model, temperature=0.7)
-
-
-def _build_tts():
-    """Select TTS provider for lowest latency."""
-    provider = os.getenv("LIVEKIT_TTS_PROVIDER", "openai")
-    voice = os.getenv("LIVEKIT_TTS_VOICE", "ash")
-    if provider == "cartesia":
-        return cartesia.TTS(voice=voice)
-    return openai.TTS(model="tts-1-hd", voice=voice)
-
-
-def _build_realtime_model():
-    """Build OpenAI Realtime model for ultra-low-latency mode."""
-    voice = os.getenv("LIVEKIT_TTS_VOICE", "ash")
-    return openai.realtime.RealtimeModel(
-        model="gpt-4o-realtime-preview",
-        voice=voice,
-        temperature=0.7,
-    )
+    async def on_enter(self) -> None:
+        """Called when the agent enters the session — greet the user."""
+        self.session.generate_reply(
+            instructions="Greet the user warmly. Introduce yourself as Mayler, "
+            "their email and productivity assistant. Offer to help with emails, "
+            "calendar, web search, or anything else. Keep it brief and natural."
+        )
 
 
 # ──────────────────────────────────────────────────────────────
-# Agent Entrypoint
+# Server & Entrypoint
 # ──────────────────────────────────────────────────────────────
 
-async def entrypoint(ctx: agents.JobContext):
+server = AgentServer()
+
+
+def prewarm(proc: JobProcess) -> None:
+    """Pre-load VAD model at process startup for fast cold-start."""
+    proc.userdata["vad"] = silero.VAD.load()
+
+
+server.setup_fnc = prewarm
+
+
+@server.rtc_session()
+async def entrypoint(ctx: JobContext) -> None:
     """Main entrypoint — called when a user connects to a LiveKit room."""
-    await ctx.connect()
+    ctx.log_context_fields = {"room": ctx.room.name}
 
-    pipeline_mode = os.getenv("LIVEKIT_PIPELINE_MODE", "realtime")
+    pipeline_mode = os.getenv("LIVEKIT_PIPELINE_MODE", "pipeline")
+
+    # Select STT provider
+    stt_provider = os.getenv("LIVEKIT_STT_PROVIDER", "deepgram")
+    if stt_provider == "deepgram":
+        stt = inference.STT("deepgram/nova-3", language="multi")
+    else:
+        stt = inference.STT("openai/gpt-4o-transcribe")
+
+    # Select LLM
+    llm_model = os.getenv("LIVEKIT_LLM_MODEL", "openai/gpt-4.1-mini")
+    llm = inference.LLM(llm_model)
+
+    # Select TTS provider and voice
+    tts_provider = os.getenv("LIVEKIT_TTS_PROVIDER", "cartesia")
+    tts_voice = os.getenv("LIVEKIT_TTS_VOICE", "")
+    if tts_provider == "cartesia":
+        tts = inference.TTS("cartesia/sonic-3", voice=tts_voice) if tts_voice else inference.TTS("cartesia/sonic-3")
+    elif tts_provider == "elevenlabs":
+        tts = inference.TTS("elevenlabs/eleven_turbo_v2", voice=tts_voice) if tts_voice else inference.TTS("elevenlabs/eleven_turbo_v2")
+    else:
+        tts = inference.TTS("openai/tts-1-hd", voice=tts_voice or "ash")
 
     if pipeline_mode == "realtime":
-        # ── Ultra-low-latency: OpenAI Realtime API ──
-        # Single model handles STT + LLM + TTS with ~300ms latency
-        logger.info("Starting Mayler agent in REALTIME mode (ultra-low latency)")
+        # Ultra-low-latency: OpenAI Realtime API (speech-to-speech)
+        logger.info("Starting Mayler agent in REALTIME mode")
+        from livekit.plugins import openai as openai_plugin
+        realtime_voice = os.getenv("LIVEKIT_TTS_VOICE", "ash")
         session = AgentSession(
-            llm=_build_realtime_model(),
-            # Adaptive interruption detection
-            allow_interruptions=True,
-            min_interruption_duration=0.4,
-            min_interruption_words=1,
-            # False interruption recovery
-            resume_false_interruption=True,
-            false_interruption_timeout=2.0,
-            # Endpointing tuned for conversational flow
-            min_endpointing_delay=0.5,
-            max_endpointing_delay=3.0,
+            llm=openai_plugin.realtime.RealtimeModel(
+                model="gpt-4o-realtime-preview",
+                voice=realtime_voice,
+                temperature=0.7,
+            ),
+            vad=ctx.proc.userdata["vad"],
+            turn_handling=TurnHandlingOptions(
+                turn_detection=MultilingualModel(),
+                interruption={
+                    "resume_false_interruption": True,
+                    "false_interruption_timeout": 1.0,
+                },
+            ),
         )
     else:
-        # ── Pipeline mode: STT → LLM → TTS ──
-        # More control over each stage, wider model selection
+        # Pipeline mode: STT → LLM → TTS (more control, wider model choice)
         logger.info("Starting Mayler agent in PIPELINE mode (STT → LLM → TTS)")
-
-        # Try to import turn detector; fall back gracefully
-        turn_detection: object = "server_vad"
-        try:
-            from livekit.plugins import turn_detector
-            turn_detection = turn_detector.EOUModel()
-            logger.info("Using LiveKit EOU turn detector (context-aware)")
-        except ImportError:
-            logger.info("Turn detector plugin not available, using server VAD")
-
         session = AgentSession(
-            stt=_build_stt(),
-            llm=_build_llm(),
-            tts=_build_tts(),
-            turn_detection=turn_detection,
-            # Adaptive interruption detection
-            allow_interruptions=True,
-            min_interruption_duration=0.4,
-            min_interruption_words=1,
-            # False interruption recovery
-            resume_false_interruption=True,
-            false_interruption_timeout=2.0,
-            # Endpointing for natural conversation
-            min_endpointing_delay=0.5,
-            max_endpointing_delay=3.0,
+            stt=stt,
+            llm=llm,
+            tts=tts,
+            vad=ctx.proc.userdata["vad"],
+            turn_handling=TurnHandlingOptions(
+                turn_detection=MultilingualModel(),
+                interruption={
+                    "resume_false_interruption": True,
+                    "false_interruption_timeout": 1.0,
+                },
+            ),
+            preemptive_generation=True,
         )
 
     # Log voice pipeline metrics for observability
     @session.on("metrics_collected")
     def _on_metrics(ev: MetricsCollectedEvent):
-        agents.metrics.log_metrics(ev.metrics)
+        metrics.log_metrics(ev.metrics)
 
-    # Start the agent with all tools and multi-modal input
+    # Start the agent session
     await session.start(
+        agent=MaylerAgent(),
         room=ctx.room,
-        agent=Agent(
-            instructions=MAYLER_INSTRUCTIONS,
-            tools=ALL_TOOLS,
-        ),
-        room_input_options=RoomInputOptions(
-            # Enable video input for multi-modal (screen share, camera)
-            video_enabled=True,
-            # Enable audio with noise cancellation
-            audio_enabled=True,
-        ),
-    )
-
-    # Greet the user (generate_reply lets the LLM craft a natural greeting)
-    await session.generate_reply(
-        instructions="Greet the user warmly. Introduce yourself as Mayler, their email and productivity assistant. Offer to help with emails, calendar, web search, or anything else."
     )
 
 
 # ──────────────────────────────────────────────────────────────
-# Worker Setup
+# Launch
 # ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    agents.cli.run_app(
-        agents.WorkerOptions(
-            entrypoint_fnc=entrypoint,
-            # Agent type for LiveKit Cloud dispatch
-            agent_name="mayler-voice-agent",
-        )
-    )
+    cli.run_app(server)

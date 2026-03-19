@@ -23,7 +23,7 @@ import type {
 import { useMayler } from '../context/MaylerContext';
 
 /** Seconds to wait for an agent to join before falling back to OpenAI */
-const AGENT_JOIN_TIMEOUT = 8;
+const AGENT_JOIN_TIMEOUT = 15;
 
 interface LiveKitConnection {
     token: string;
@@ -257,7 +257,8 @@ export const useLiveKit = () => {
             setLoading(false);
         }
     }, [setConnected, setLoading, setError, setSpeaking, setListening, fetchToken,
-        setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript, addChatMessage]);
+        setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript,
+        addChatMessage, setVoicePipeline]);
 
     /**
      * Disconnect from LiveKit room.
