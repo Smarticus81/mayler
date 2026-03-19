@@ -1,6 +1,6 @@
-# LiveKit Agents Framework with plugins
-livekit-agents[openai,silero,deepgram,cartesia,turn-detector]~=1.4
-livekit-plugins-openai~=1.4
+# LiveKit Agents Framework with plugins (v1.5.0 latest as of March 2026)
+livekit-agents[openai,silero,deepgram,cartesia,turn-detector]~=1.5
+livekit-plugins-openai~=1.5
 
 # Multi-modal & Search
 aiohttp>=3.9.0

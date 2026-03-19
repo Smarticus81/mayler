@@ -198,8 +198,10 @@ async def entrypoint(ctx: agents.JobContext):
         ),
     )
 
-    # Greet the user
-    await session.say("Hey there! I'm Mayler, your email and productivity assistant. How can I help you today?")
+    # Greet the user (generate_reply lets the LLM craft a natural greeting)
+    await session.generate_reply(
+        instructions="Greet the user warmly. Introduce yourself as Mayler, their email and productivity assistant. Offer to help with emails, calendar, web search, or anything else."
+    )
 
 
 # ──────────────────────────────────────────────────────────────
