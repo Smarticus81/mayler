@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAuth } from '../hooks/useAuth';
-import type { VoiceOption, ThemeMode } from '../types';
+import type { VoiceOption, VoicePipeline, ThemeMode } from '../types';
 
 export const SettingsModal: React.FC = () => {
     const {
@@ -9,6 +9,8 @@ export const SettingsModal: React.FC = () => {
         wakeWordEnabled, setWakeWordEnabled,
         googleStatus,
         selectedVoice, setSelectedVoice,
+        voicePipeline, setVoicePipeline,
+        livekitAvailable,
         themeMode, setThemeMode,
     } = useMayler();
 
@@ -97,6 +99,37 @@ export const SettingsModal: React.FC = () => {
                                         {theme.label}
                                     </button>
                                 ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Voice Pipeline */}
+                    <div className="setting-section">
+                        <h3>Voice Pipeline</h3>
+                        <div className="setting-item">
+                            <div className="setting-info">
+                                <label>Engine</label>
+                                <span className="setting-description">
+                                    {voicePipeline === 'livekit-cloud'
+                                        ? 'LiveKit Cloud — adaptive interruption, multi-modal, low latency'
+                                        : 'OpenAI WebRTC — direct realtime connection'}
+                                </span>
+                            </div>
+                            <div className="theme-selector">
+                                <button
+                                    className={`theme-option ${voicePipeline === 'openai-webrtc' ? 'active' : ''}`}
+                                    onClick={() => setVoicePipeline('openai-webrtc')}
+                                >
+                                    OpenAI
+                                </button>
+                                <button
+                                    className={`theme-option ${voicePipeline === 'livekit-cloud' ? 'active' : ''}`}
+                                    onClick={() => setVoicePipeline('livekit-cloud')}
+                                    disabled={!livekitAvailable}
+                                    title={!livekitAvailable ? 'LiveKit not configured on server' : ''}
+                                >
+                                    LiveKit{!livekitAvailable ? ' (N/A)' : ''}
+                                </button>
                             </div>
                         </div>
                     </div>
