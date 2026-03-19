@@ -1,0 +1,11 @@
+[agent]
+name = "mayler-voice-agent"
+version = "1.0.0"
+
+[agent.build]
+dockerfile = "Dockerfile"
+context = "."
+
+[agent.runtime]
+# Environment variables are inherited from LiveKit Cloud project settings
+# or from the .env file when running locally

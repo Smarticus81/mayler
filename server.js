@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import GmailService from './backend/gmail-service.js';
 import UtilityService from './backend/utility-service.js';
 import SearchService from './backend/search-service.js';
+import LiveKitService from './backend/livekit-service.js';
 
 import { createTokenRouter } from './backend/routes/token.js';
 import { createGmailRouter } from './backend/routes/gmail.js';
@@ -18,6 +19,8 @@ import { createAuthRouter } from './backend/routes/auth.js';
 import { createRimeRouter } from './backend/routes/rime.js';
 import { createVisionRouter } from './backend/routes/vision.js';
 import { createBrowsingRouter } from './backend/routes/browsing.js';
+import { createLiveKitRouter } from './backend/routes/livekit.js';
+import { createDeepSearchRouter } from './backend/routes/deep-search.js';
 
 
 // Load environment variables
@@ -32,6 +35,7 @@ const __dirname = path.dirname(__filename);
 const gmailService = new GmailService();
 const utilityService = new UtilityService();
 const searchService = new SearchService();
+const livekitService = new LiveKitService();
 
 // Pre-initialize Gmail if token exists
 gmailService.initialize().catch(err => console.error('Initial Gmail check failed:', err));
@@ -72,6 +76,8 @@ const authRouter = createAuthRouter();
 const rimeRouter = createRimeRouter();
 const visionRouter = createVisionRouter();
 const browsingRouter = createBrowsingRouter();
+const livekitRouter = createLiveKitRouter(livekitService);
+const deepSearchRouter = createDeepSearchRouter(searchService);
 
 // Mount Routes
 app.use('/api/auth', authRouter);
@@ -84,6 +90,8 @@ app.use('/api/chat', chatRouter);
 app.use('/api/rime', rimeRouter);
 app.use('/api/vision', visionRouter);
 app.use('/api/browsing', browsingRouter);
+app.use('/api/livekit', livekitRouter);
+app.use('/api/deep-search', deepSearchRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));

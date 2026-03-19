@@ -478,6 +478,27 @@ export const useToolkit = () => {
                     });
                     return await safeJson(resp);
                 }
+                case 'deep_search': {
+                    const resp = await fetch('/api/deep-search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            query: a.query,
+                            maxResults: (a.maxResults as number | undefined) ?? 8,
+                            includeNews: a.includeNews !== false,
+                            includeFacts: a.includeFacts !== false,
+                        }),
+                    });
+                    return await safeJson(resp);
+                }
+                case 'deep_research': {
+                    const resp = await fetch('/api/deep-search/research', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: a.query, maxResults: (a.maxResults as number | undefined) ?? 5 }),
+                    });
+                    return await safeJson(resp);
+                }
                 case 'search_videos': {
                     const resp = await fetch('/api/search/videos', {
                         method: 'POST',
@@ -573,6 +594,10 @@ export const useToolkit = () => {
         { type: 'function', name: 'web_search', description: 'Search the web for any information, news, or results.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number' } }, required: ['query'] } },
         { type: 'function', name: 'browse_url', description: 'Fetches and extracts content from any URL. Returns title, description, main content, and links. Use this to read articles, documentation, or any web page.', parameters: { type: 'object', properties: { url: { type: 'string', description: 'The URL to browse and extract content from' } }, required: ['url'] } },
         { type: 'function', name: 'extract_data', description: 'Extracts structured data from a web page (headings, paragraphs, lists). Can use CSS selectors for specific extraction.', parameters: { type: 'object', properties: { url: { type: 'string', description: 'The URL to extract data from' }, selector: { type: 'string', description: 'Optional CSS selector to extract specific elements' } }, required: ['url'] } },
+
+        // Deep Search & Research
+        { type: 'function', name: 'deep_search', description: 'Performs a comprehensive deep internet search across multiple sources. Combines web search results, latest news, and factual information (Wikipedia/encyclopedic) into one unified response. Use this when the user needs thorough, well-sourced information on any topic.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'The search query or topic to research' }, maxResults: { type: 'number', description: 'Max web results (default 8)' }, includeNews: { type: 'boolean', description: 'Include news articles (default true)' }, includeFacts: { type: 'boolean', description: 'Include factual/Wikipedia info (default true)' } }, required: ['query'] } },
+        { type: 'function', name: 'deep_research', description: 'Research-grade internet search that combines standard web search with authoritative source filtering and multiple knowledge bases. Use this for in-depth research, academic topics, or when the user needs the most comprehensive information available.', parameters: { type: 'object', properties: { query: { type: 'string', description: 'The research topic or question' }, maxResults: { type: 'number', description: 'Max results per source (default 5)' } }, required: ['query'] } },
 
         // Vision & Document Analysis
         { type: 'function', name: 'analyze_documents', description: 'Analyzes uploaded images or documents using GPT-5.2 vision. Can analyze screenshots, photos of documents, diagrams, spreadsheets, receipts, contracts, etc. Supports multiple images at once. User can show you documents via camera.', parameters: { type: 'object', properties: { images: { type: 'array', items: { type: 'string' }, description: 'Array of base64 encoded images to analyze' }, query: { type: 'string', description: 'What to analyze or extract. E.g., "Extract all text", "Summarize this document", "What are the key insights?", "Extract receipt total and items"' } }, required: ['images', 'query'] } },

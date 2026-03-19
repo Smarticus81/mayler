@@ -261,6 +261,63 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   LIVEKIT CONTROLS & PIPELINE BADGE
+   ═══════════════════════════════════════════════════════════════ */
+.livekit-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.lk-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lk-btn:hover {
+  background: rgba(255,255,255,0.15);
+  color: var(--text-primary);
+  border-color: rgba(255,255,255,0.25);
+}
+
+.pipeline-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: rgba(99,102,241,0.15);
+  color: #818cf8;
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .lk-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .lk-btn:hover {
+  background: rgba(0,0,0,0.08);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .pipeline-badge {
+  background: rgba(99,102,241,0.1);
+  color: #6366f1;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    SETTINGS PANEL — Slide-out Drawer
    ═══════════════════════════════════════════════════════════════ */
 .settings-panel {

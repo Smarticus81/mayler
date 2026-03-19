@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
-import type { GoogleStatus, VoiceOption, VoiceEngine, ThemeMode, ChatMessage } from '../types';
+import type { GoogleStatus, VoiceOption, VoiceEngine, VoicePipeline, ThemeMode, ChatMessage } from '../types';
 
 interface MaylerContextType {
     // Connection State
@@ -43,6 +43,10 @@ interface MaylerContextType {
     setSelectedVoice: Dispatch<SetStateAction<VoiceOption>>;
     voiceEngine: VoiceEngine;
     setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
+    voicePipeline: VoicePipeline;
+    setVoicePipeline: Dispatch<SetStateAction<VoicePipeline>>;
+    livekitAvailable: boolean;
+    setLivekitAvailable: Dispatch<SetStateAction<boolean>>;
 
     // Theme
     themeMode: ThemeMode;
@@ -107,6 +111,11 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const stored = localStorage.getItem('mayler_engine');
         return (stored as VoiceEngine) || 'openai';
     });
+    const [voicePipeline, setVoicePipeline] = useState<VoicePipeline>(() => {
+        const stored = localStorage.getItem('mayler_pipeline');
+        return (stored as VoicePipeline) || 'openai-webrtc';
+    });
+    const [livekitAvailable, setLivekitAvailable] = useState(false);
 
     // Theme
     const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
@@ -150,6 +159,18 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [voiceEngine]);
 
     useEffect(() => {
+        localStorage.setItem('mayler_pipeline', voicePipeline);
+    }, [voicePipeline]);
+
+    // Check if LiveKit is available on mount
+    useEffect(() => {
+        fetch('/api/livekit/status')
+            .then(r => r.json())
+            .then(data => setLivekitAvailable(data.configured === true))
+            .catch(() => setLivekitAvailable(false));
+    }, []);
+
+    useEffect(() => {
         localStorage.setItem('mayler_theme', themeMode);
     }, [themeMode]);
 
@@ -169,6 +190,8 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         googleStatus, setGoogleStatus,
         selectedVoice, setSelectedVoice,
         voiceEngine, setVoiceEngine,
+        voicePipeline, setVoicePipeline,
+        livekitAvailable, setLivekitAvailable,
         themeMode, setThemeMode,
         resolvedTheme,
         showSettings, setShowSettings,

@@ -13,9 +13,18 @@ export type VoiceOption = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable
 
 export type VoiceEngine = 'openai';
 
+export type VoicePipeline = 'openai-webrtc' | 'livekit-cloud';
+
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 export interface WebRTCSessionConfig {
     voice: VoiceOption;
     instructions: string;
+}
+
+export interface LiveKitSessionConfig {
+    wsUrl: string;
+    token: string;
+    roomName: string;
+    identity: string;
 }
