@@ -1,4 +1,4 @@
-import { AccessToken, VideoGrant, RoomServiceClient } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 
 class LiveKitService {
   constructor() {
@@ -29,20 +29,18 @@ class LiveKitService {
       metadata = '',
     } = options;
 
-    const grant = new VideoGrant({
+    const token = new AccessToken(this.apiKey, this.apiSecret, {
+      identity,
+      ttl,
+      metadata,
+    });
+    token.addGrant({
       roomJoin: true,
       room: roomName,
       canPublish,
       canSubscribe,
       canPublishData,
     });
-
-    const token = new AccessToken(this.apiKey, this.apiSecret, {
-      identity,
-      ttl,
-      metadata,
-    });
-    token.addGrant(grant);
 
     return await token.toJwt();
   }
@@ -65,14 +63,6 @@ class LiveKitService {
       metadata = '',
     } = options;
 
-    const grant = new VideoGrant({
-      roomJoin: true,
-      room: roomName,
-      canPublish,
-      canSubscribe,
-      canPublishData,
-    });
-
     const token = new AccessToken(this.apiKey, this.apiSecret, {
       identity,
       ttl,
@@ -81,7 +71,13 @@ class LiveKitService {
         agents: [{ agentName }],
       },
     });
-    token.addGrant(grant);
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish,
+      canSubscribe,
+      canPublishData,
+    });
 
     return await token.toJwt();
   }
