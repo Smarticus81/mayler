@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
@@ -19,11 +19,28 @@ export const MainLayout: React.FC = () => {
 
     const isLiveKit = voicePipeline === 'livekit-cloud';
     const activePipeline = isLiveKit ? livekitPipeline : openaiPipeline;
-    const { connect, disconnect, remoteAudioElRef, audioLevel } = activePipeline;
+    const { connect, disconnect, audioLevel } = activePipeline;
+
+    // Use a stable audio ref shared across both pipelines
+    const sharedAudioRef = useRef<HTMLAudioElement | null>(null);
+    useEffect(() => {
+        openaiPipeline.remoteAudioElRef.current = sharedAudioRef.current;
+        livekitPipeline.remoteAudioElRef.current = sharedAudioRef.current;
+    });
 
     const { initAudioContext, playWakeChime } = useAudio();
     const { playGreeting, isReady } = useGreeting();
     const [isActive, setIsActive] = useState(false);
+
+    // Auto-connect via OpenAI when LiveKit falls back
+    const prevPipelineRef = useRef(voicePipeline);
+    useEffect(() => {
+        if (prevPipelineRef.current === 'livekit-cloud' && voicePipeline === 'openai-webrtc' && isActive && !connected) {
+            console.log('[Fallback] LiveKit → OpenAI WebRTC, auto-connecting...');
+            openaiPipeline.connect(true);
+        }
+        prevPipelineRef.current = voicePipeline;
+    }, [voicePipeline, isActive, connected, openaiPipeline]);
 
     const handleStart = () => {
         initAudioContext();
@@ -37,7 +54,7 @@ export const MainLayout: React.FC = () => {
             if (isReady) {
                 playGreeting();
             }
-            connect(false);
+            connect(true);
         },
         () => {
             playWakeChime();
@@ -50,7 +67,7 @@ export const MainLayout: React.FC = () => {
             <div className="ambient-bg" />
             <div className="glass-overlay" />
 
-            <audio ref={remoteAudioElRef} autoPlay />
+            <audio ref={sharedAudioRef} autoPlay />
 
             <div className="status-bar">
                 {connected && isLiveKit && (

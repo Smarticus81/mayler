@@ -1,7 +1,7 @@
 import React, { useCallback, useRef } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAuth } from '../hooks/useAuth';
-import type { VoiceOption, VoicePipeline, ThemeMode } from '../types';
+import type { VoiceOption, ThemeMode } from '../types';
 
 export const SettingsModal: React.FC = () => {
     const {

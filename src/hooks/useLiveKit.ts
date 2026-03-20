@@ -1,16 +1,29 @@
 /**
  * useLiveKit — LiveKit Agent Cloud voice pipeline hook.
  *
- * Provides an alternative to the direct OpenAI WebRTC pipeline, routing
- * audio through LiveKit's infrastructure for production-grade reliability,
- * adaptive interruption detection, and multi-modal capabilities.
- *
- * The LiveKit room connects to the Mayler Python agent worker which
- * handles STT → LLM → TTS (or OpenAI Realtime) with full tool access.
+ * Uses the official livekit-client SDK for proper signaling (protobuf)
+ * and media handling. Connects to a LiveKit room where the Mayler
+ * Python agent worker handles STT → LLM → TTS with full tool access.
  */
 
 import { useRef, useCallback, useState } from 'react';
+import {
+    Room,
+    RoomEvent,
+    Track,
+    ConnectionState,
+} from 'livekit-client';
+import type {
+    RemoteTrack,
+    RemoteTrackPublication,
+    RemoteParticipant,
+    TranscriptionSegment,
+    Participant,
+} from 'livekit-client';
 import { useMayler } from '../context/MaylerContext';
+
+/** Seconds to wait for an agent to join before falling back to OpenAI */
+const AGENT_JOIN_TIMEOUT = 15;
 
 interface LiveKitConnection {
     token: string;
@@ -30,13 +43,13 @@ export const useLiveKit = () => {
         setInterimTranscript,
         setAgentTranscript,
         setAgentInterimTranscript,
-        setIsWakeMode,
         addChatMessage,
+        setVoicePipeline,
     } = useMayler();
 
-    const pcRef = useRef<RTCPeerConnection | null>(null);
-    const wsRef = useRef<WebSocket | null>(null);
-    const localStreamRef = useRef<MediaStream | null>(null);
+    const roomRef = useRef<Room | null>(null);
+    const agentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const agentJoinedRef = useRef(false);
     const remoteAudioElRef = useRef<HTMLAudioElement | null>(null);
     const [audioLevel, setAudioLevel] = useState(0);
     const [lkConnected, setLkConnected] = useState(false);
@@ -61,11 +74,9 @@ export const useLiveKit = () => {
     }, []);
 
     /**
-     * Connect to LiveKit room using native WebRTC.
-     * Uses the LiveKit signaling protocol via WebSocket, then establishes
-     * a peer connection for audio/video streaming.
+     * Connect to LiveKit room using the official SDK.
      */
-    const connect = useCallback(async (shouldGreet = false) => {
+    const connect = useCallback(async (_shouldGreet = false) => {
         setLoading(true);
         setError('');
 
@@ -73,45 +84,45 @@ export const useLiveKit = () => {
             const { token, wsUrl, roomName, identity } = await fetchToken();
             console.log(`[LiveKit] Connecting to room ${roomName} as ${identity}`);
 
-            // Connect to LiveKit via WebSocket for signaling
-            const signalUrl = `${wsUrl}/rtc?access_token=${encodeURIComponent(token)}&auto_subscribe=1&protocol=13`;
-            const ws = new WebSocket(signalUrl);
-            wsRef.current = ws;
-
-            // Create peer connection with STUN/TURN
-            const pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                ],
-                bundlePolicy: 'max-bundle',
-                rtcpMuxPolicy: 'require',
+            const room = new Room({
+                adaptiveStream: true,
+                dynacast: true,
+                audioCaptureDefaults: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
             });
-            pcRef.current = pc;
+            roomRef.current = room;
 
-            // Handle incoming audio tracks from the agent
-            pc.ontrack = (e) => {
-                const stream = e.streams[0];
-                if (!stream) return;
+            // Track subscribed — handle incoming audio from the agent
+            room.on(RoomEvent.TrackSubscribed, (
+                track: RemoteTrack,
+                _publication: RemoteTrackPublication,
+                participant: RemoteParticipant,
+            ) => {
+                console.log(`[LiveKit] Track subscribed: ${track.kind} from ${participant.identity}`);
 
-                if (e.track.kind === 'audio') {
-                    if (remoteAudioElRef.current) {
-                        remoteAudioElRef.current.srcObject = stream;
-                    }
+                if (track.kind === Track.Kind.Audio) {
+                    // Attach audio to the hidden audio element for playback
+                    const el = track.attach();
+                    el.style.display = 'none';
+                    document.body.appendChild(el);
 
-                    // Audio level analysis for VoiceOrb
+                    // Audio level monitoring for VoiceOrb
                     try {
                         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
                         const audioCtx = new AudioContextClass();
                         const analyser = audioCtx.createAnalyser();
                         analyser.fftSize = 256;
-                        const source = audioCtx.createMediaStreamSource(stream);
+                        const source = audioCtx.createMediaStreamSource(
+                            new MediaStream([track.mediaStreamTrack])
+                        );
                         source.connect(analyser);
-
                         const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
                         const updateLevel = () => {
-                            if (pcRef.current?.connectionState !== 'connected') {
+                            if (room.state !== ConnectionState.Connected) {
                                 audioCtx.close();
                                 return;
                             }
@@ -128,186 +139,142 @@ export const useLiveKit = () => {
                         console.error('[LiveKit] Audio analysis failed:', err);
                     }
                 }
-            };
+            });
 
-            // ICE candidate handling
-            pc.onicecandidate = (e) => {
-                if (e.candidate && ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({
-                        case: 'trickle',
-                        trickle: {
-                            candidateInit: JSON.stringify(e.candidate),
-                            target: 0, // PUBLISHER
-                        },
-                    }));
-                }
-            };
+            // Track unsubscribed — clean up
+            room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+                track.detach().forEach(el => el.remove());
+            });
 
-            // Connection state tracking
-            pc.onconnectionstatechange = () => {
-                const state = pc.connectionState;
+            // Connection state changes
+            room.on(RoomEvent.ConnectionStateChanged, (state: ConnectionState) => {
                 console.log(`[LiveKit] Connection state: ${state}`);
-                if (state === 'connected') {
+                if (state === ConnectionState.Connected) {
                     setConnected(true);
                     setLkConnected(true);
                     setLoading(false);
-                } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
+                    setListening(true);
+                } else if (state === ConnectionState.Disconnected) {
                     setConnected(false);
                     setLkConnected(false);
                     setSpeaking(false);
                     setListening(false);
                 }
-            };
-
-            // Get microphone
-            const ms = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
-                    sampleRate: 48000,
-                },
             });
-            localStreamRef.current = ms;
-            ms.getTracks().forEach(track => pc.addTrack(track, ms));
 
-            // WebSocket signaling handler
-            ws.onmessage = async (event) => {
-                try {
-                    const msg = JSON.parse(event.data);
+            // Agent speaking state via active speaker changes
+            room.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+                const agentSpeaking = speakers.some(
+                    s => s.identity?.includes('agent') || s.name?.includes('mayler')
+                );
+                setSpeaking(agentSpeaking);
+            });
 
-                    if (msg.case === 'answer' || msg.answer) {
-                        const answer = msg.answer || msg;
-                        if (answer.sdp) {
-                            await pc.setRemoteDescription({
-                                type: 'answer',
-                                sdp: answer.sdp,
-                            });
+            // Transcription events from the agent
+            room.on(RoomEvent.TranscriptionReceived, (
+                segments: TranscriptionSegment[],
+                participant?: Participant,
+            ) => {
+                const isAgent = participant?.identity?.includes('agent')
+                    || participant?.name?.includes('mayler');
+
+                for (const seg of segments) {
+                    if (isAgent) {
+                        if (seg.final) {
+                            setAgentTranscript(seg.text);
+                            setAgentInterimTranscript('');
+                            if (seg.text?.trim()) addChatMessage('agent', seg.text);
+                        } else {
+                            setAgentInterimTranscript(seg.text || '');
+                        }
+                    } else {
+                        if (seg.final) {
+                            setTranscript(seg.text);
+                            setInterimTranscript('');
+                            if (seg.text?.trim()) addChatMessage('user', seg.text);
+                        } else {
+                            setInterimTranscript(seg.text || '');
                         }
                     }
-
-                    if (msg.case === 'trickle' || msg.trickle) {
-                        const trickle = msg.trickle || msg;
-                        if (trickle.candidateInit) {
-                            const candidate = JSON.parse(trickle.candidateInit);
-                            await pc.addIceCandidate(candidate);
-                        }
-                    }
-
-                    if (msg.case === 'offer' || msg.offer) {
-                        const offer = msg.offer || msg;
-                        if (offer.sdp) {
-                            await pc.setRemoteDescription({
-                                type: 'offer',
-                                sdp: offer.sdp,
-                            });
-                            const answer = await pc.createAnswer();
-                            await pc.setLocalDescription(answer);
-                            ws.send(JSON.stringify({
-                                case: 'answer',
-                                answer: { sdp: answer.sdp, type: answer.type },
-                            }));
-                        }
-                    }
-
-                    // Handle data messages (transcripts, state updates)
-                    if (msg.case === 'update') {
-                        handleLiveKitUpdate(msg);
-                    }
-                } catch (err) {
-                    console.error('[LiveKit] Signal message error:', err);
                 }
-            };
+            });
 
-            ws.onopen = async () => {
-                console.log('[LiveKit] WebSocket connected, creating offer...');
+            room.on(RoomEvent.Disconnected, () => {
+                console.log('[LiveKit] Disconnected');
+                setConnected(false);
+                setLkConnected(false);
+            });
 
-                // Create and send offer
-                const offer = await pc.createOffer({
-                    offerToReceiveAudio: true,
-                    offerToReceiveVideo: true,
-                });
-                await pc.setLocalDescription(offer);
+            // Detect when agent joins
+            agentJoinedRef.current = false;
+            room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+                console.log(`[LiveKit] Participant joined: ${participant.identity}`);
+                if (participant.identity?.includes('agent') || participant.name?.includes('mayler')) {
+                    agentJoinedRef.current = true;
+                    if (agentTimerRef.current) {
+                        clearTimeout(agentTimerRef.current);
+                        agentTimerRef.current = null;
+                    }
+                    console.log('[LiveKit] Agent joined the room');
+                }
+            });
 
-                ws.send(JSON.stringify({
-                    case: 'offer',
-                    offer: { sdp: offer.sdp, type: offer.type },
-                    autoSubscribe: true,
-                }));
-            };
+            // Connect to the room and publish microphone
+            await room.connect(wsUrl, token);
+            console.log('[LiveKit] Connected to room');
 
-            ws.onclose = () => {
-                console.log('[LiveKit] WebSocket closed');
-            };
+            // Check if agent is already in the room
+            for (const [, p] of room.remoteParticipants) {
+                if (p.identity?.includes('agent') || p.name?.includes('mayler')) {
+                    agentJoinedRef.current = true;
+                    console.log('[LiveKit] Agent already in room');
+                    break;
+                }
+            }
 
-            ws.onerror = (err) => {
-                console.error('[LiveKit] WebSocket error:', err);
-                setError('LiveKit connection error');
-                setLoading(false);
-            };
+            // Start agent join timeout — fall back to OpenAI if no agent appears
+            if (!agentJoinedRef.current) {
+                agentTimerRef.current = setTimeout(() => {
+                    if (!agentJoinedRef.current && roomRef.current) {
+                        console.warn(`[LiveKit] No agent joined within ${AGENT_JOIN_TIMEOUT}s — falling back to OpenAI WebRTC`);
+                        roomRef.current.disconnect();
+                        roomRef.current = null;
+                        setConnected(false);
+                        setLkConnected(false);
+                        setLoading(false);
+                        setError('LiveKit agent unavailable — switching to OpenAI pipeline');
+                        setVoicePipeline('openai-webrtc');
+                    }
+                }, AGENT_JOIN_TIMEOUT * 1000);
+            }
+
+            await room.localParticipant.setMicrophoneEnabled(true);
+            console.log('[LiveKit] Microphone enabled');
+
         } catch (e: any) {
             console.error('[LiveKit] Connection error:', e);
             setError(e.message || 'Failed to connect to LiveKit');
             setLoading(false);
         }
-    }, [setConnected, setLoading, setError, setSpeaking, setListening, fetchToken]);
-
-    /**
-     * Handle LiveKit room state updates (participant data, transcripts).
-     */
-    const handleLiveKitUpdate = useCallback((msg: any) => {
-        // Agent speaking state from participant metadata
-        if (msg.participants) {
-            for (const p of msg.participants) {
-                if (p.identity?.includes('agent') || p.name?.includes('mayler')) {
-                    const meta = p.metadata ? JSON.parse(p.metadata) : {};
-                    if (meta.speaking !== undefined) {
-                        setSpeaking(meta.speaking);
-                    }
-                }
-            }
-        }
-
-        // Transcription data
-        if (msg.transcription) {
-            const { text, isFinal, participantIdentity } = msg.transcription;
-            const isAgent = participantIdentity?.includes('agent');
-
-            if (isAgent) {
-                if (isFinal) {
-                    setAgentTranscript(text);
-                    setAgentInterimTranscript('');
-                    if (text?.trim()) addChatMessage('agent', text);
-                } else {
-                    setAgentInterimTranscript(text || '');
-                }
-            } else {
-                if (isFinal) {
-                    setTranscript(text);
-                    setInterimTranscript('');
-                    if (text?.trim()) addChatMessage('user', text);
-                } else {
-                    setInterimTranscript(text || '');
-                }
-            }
-        }
-    }, [setSpeaking, setAgentTranscript, setAgentInterimTranscript,
-        setTranscript, setInterimTranscript, addChatMessage]);
+    }, [setConnected, setLoading, setError, setSpeaking, setListening, fetchToken,
+        setTranscript, setInterimTranscript, setAgentTranscript, setAgentInterimTranscript,
+        addChatMessage, setVoicePipeline]);
 
     /**
      * Disconnect from LiveKit room.
      */
     const disconnect = useCallback(() => {
-        wsRef.current?.close();
-        pcRef.current?.close();
-        localStreamRef.current?.getTracks().forEach(t => t.stop());
-        wsRef.current = null;
-        pcRef.current = null;
-        localStreamRef.current = null;
+        if (agentTimerRef.current) {
+            clearTimeout(agentTimerRef.current);
+            agentTimerRef.current = null;
+        }
+        roomRef.current?.disconnect();
+        roomRef.current = null;
         setConnected(false);
         setLkConnected(false);
         setSpeaking(false);
         setListening(false);
+        setAudioLevel(0);
     }, [setConnected, setSpeaking, setListening]);
 
     /**
@@ -315,21 +282,9 @@ export const useLiveKit = () => {
      * agent can see for visual understanding.
      */
     const shareScreen = useCallback(async () => {
-        if (!pcRef.current) return;
-
+        if (!roomRef.current) return;
         try {
-            const screenStream = await navigator.mediaDevices.getDisplayMedia({
-                video: { frameRate: 5 }, // Low framerate for efficiency
-                audio: false,
-            });
-
-            const videoTrack = screenStream.getVideoTracks()[0];
-            pcRef.current.addTrack(videoTrack, screenStream);
-
-            videoTrack.onended = () => {
-                console.log('[LiveKit] Screen share ended');
-            };
-
+            await roomRef.current.localParticipant.setScreenShareEnabled(true);
             console.log('[LiveKit] Screen share started');
         } catch (err) {
             console.error('[LiveKit] Screen share failed:', err);
@@ -340,22 +295,10 @@ export const useLiveKit = () => {
      * Share camera for multi-modal — agent can see what the camera sees.
      */
     const shareCamera = useCallback(async () => {
-        if (!pcRef.current) return;
-
+        if (!roomRef.current) return;
         try {
-            const cameraStream = await navigator.mediaDevices.getUserMedia({
-                video: {
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
-                    frameRate: { ideal: 10 },
-                },
-            });
-
-            const videoTrack = cameraStream.getVideoTracks()[0];
-            pcRef.current.addTrack(videoTrack, cameraStream);
-
+            await roomRef.current.localParticipant.setCameraEnabled(true);
             console.log('[LiveKit] Camera share started');
-            return cameraStream;
         } catch (err) {
             console.error('[LiveKit] Camera share failed:', err);
             return null;
@@ -366,14 +309,10 @@ export const useLiveKit = () => {
      * Send a text message via data channel (for text-based interaction).
      */
     const sendTextMessage = useCallback((text: string) => {
-        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
-        wsRef.current.send(JSON.stringify({
-            case: 'data',
-            data: {
-                kind: 'LOSSY',
-                payload: btoa(JSON.stringify({ type: 'user_message', text })),
-            },
-        }));
+        if (!roomRef.current) return;
+        const encoder = new TextEncoder();
+        const payload = encoder.encode(JSON.stringify({ type: 'user_message', text }));
+        roomRef.current.localParticipant.publishData(payload, { reliable: true });
     }, []);
 
     return {

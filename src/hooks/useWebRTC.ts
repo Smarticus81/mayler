@@ -28,6 +28,7 @@ export const useWebRTC = () => {
     const remoteAudioElRef = useRef<HTMLAudioElement | null>(null);
 
     const shouldGreetOnConnectRef = useRef<boolean>(false);
+    const activeResponseRef = useRef(false);
     const [audioLevel, setAudioLevel] = useState(0);
 
     // Use a ref to track speaking state for the dc.onmessage closure.
@@ -301,12 +302,19 @@ TERMINATION:
                 const t = asString(msg.type);
                 if (t === 'error') {
                     const errObj = asObject(msg.error);
-                    setError(asString(errObj?.message) || 'Realtime error');
+                    const errMsg = asString(errObj?.message) || 'Realtime error';
+                    // Non-fatal errors from OpenAI (e.g. cancelling when no response active)
+                    if (errMsg.toLowerCase().includes('cancellation failed') ||
+                        errMsg.toLowerCase().includes('no active response')) {
+                        console.warn('[WebRTC] Non-fatal:', errMsg);
+                        return;
+                    }
+                    setError(errMsg);
                     return;
                 }
 
                 if (t === 'input_audio_buffer.speech_started') {
-                    if (speakingRef.current) sendEvent({ type: 'response.cancel' });
+                    if (activeResponseRef.current) sendEvent({ type: 'response.cancel' });
                     setListening(true);
                 }
                 if (t === 'input_audio_buffer.speech_stopped') {
@@ -314,9 +322,11 @@ TERMINATION:
                 }
 
                 if (t === 'response.created') {
+                    activeResponseRef.current = true;
                     setSpeaking(true);
                 }
                 if (t === 'response.done') {
+                    activeResponseRef.current = false;
                     setSpeaking(false);
                     setAgentInterimTranscript('');
                 }
