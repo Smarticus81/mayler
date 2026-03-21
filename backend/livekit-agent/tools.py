@@ -31,53 +31,156 @@ async def _api(method: str, path: str, body: dict | None = None) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────
-# Gmail Tools
+# Gmail — Connection & Auth
 # ──────────────────────────────────────────────────────────────
 
 @function_tool()
-async def get_emails(max_results: int = 5) -> str:
-    """Gets email list with metadata (id, subject, from, date, snippet).
-    Returns up to max_results emails. Call again for next batch."""
-    data = await _api("GET", f"/api/gmail/emails?maxResults={max_results}")
+async def check_gmail_connection() -> str:
+    """Checks if Gmail is connected and authenticated. Returns connection
+    status and an auth URL if not connected. Call this before any email
+    operation if the user hasn't connected Gmail yet."""
+    data = await _api("GET", "/api/gmail/auth-status")
+    return json.dumps(data)
+
+
+# ──────────────────────────────────────────────────────────────
+# Gmail — Reading & Listing
+# ──────────────────────────────────────────────────────────────
+
+@function_tool()
+async def get_emails(
+    max_results: int = 5,
+    page_token: str = "",
+    query: str = "in:inbox"
+) -> str:
+    """Gets a page of emails with metadata (id, subject, from, date, snippet).
+    Returns emails and a nextPageToken for fetching the next page.
+
+    Args:
+        max_results: Number of emails to fetch (1-20).
+        page_token: Token from a previous get_emails response to get the NEXT page.
+                    Leave empty for the first page.
+        query: Gmail search query. Default 'in:inbox'. Examples:
+               'is:unread', 'from:someone@gmail.com', 'subject:invoice',
+               'in:inbox is:unread', 'newer_than:1d', 'has:attachment'.
+    """
+    params = f"maxResults={max_results}&query={query}"
+    if page_token:
+        params += f"&pageToken={page_token}"
+    data = await _api("GET", f"/api/gmail/emails?{params}")
     return json.dumps(data)
 
 
 @function_tool()
 async def get_email_by_id(email_id: str) -> str:
-    """Gets full email content by ID. Only use IDs returned by get_emails."""
+    """Gets full email content by ID. Only use IDs returned by get_emails
+    or search_emails. Returns subject, from, to, date, body, attachments.
+    If it returns 404 or error, skip this email and move to the next one."""
     data = await _api("GET", f"/api/gmail/email/{email_id}")
     return json.dumps(data)
 
 
 @function_tool()
 async def search_emails(query: str, max_results: int = 5) -> str:
-    """Searches emails in Gmail with a query string."""
-    data = await _api("POST", "/api/gmail/search", {"query": query, "maxResults": max_results})
+    """Searches emails using Gmail search syntax. Returns matching emails
+    with metadata. Use Gmail query operators:
+    - from:user@example.com
+    - to:user@example.com
+    - subject:keyword
+    - is:unread / is:starred / is:important
+    - has:attachment
+    - newer_than:7d / older_than:1m
+    - label:INBOX / label:SENT
+    - filename:pdf
+    Combine operators: 'from:boss@work.com is:unread newer_than:3d'"""
+    data = await _api("POST", "/api/gmail/search", {
+        "query": query, "maxResults": max_results
+    })
+    return json.dumps(data)
+
+
+# ──────────────────────────────────────────────────────────────
+# Gmail — Composing & Drafts
+# ──────────────────────────────────────────────────────────────
+
+@function_tool()
+async def create_draft(
+    to: str, subject: str, text: str,
+    cc: str = "", bcc: str = ""
+) -> str:
+    """Creates and saves a draft email. Does NOT send it.
+    The user must review and send manually."""
+    data = await _api("POST", "/api/gmail/drafts", {
+        "to": to, "subject": subject, "text": text,
+        "cc": cc, "bcc": bcc
+    })
     return json.dumps(data)
 
 
 @function_tool()
-async def create_draft(to: str, subject: str, text: str, cc: str = "", bcc: str = "") -> str:
-    """Creates and saves a draft email. Does NOT send it."""
-    data = await _api("POST", "/api/gmail/drafts", {
-        "to": to, "subject": subject, "text": text, "cc": cc, "bcc": bcc
+async def reply_to_email(email_id: str, text: str) -> str:
+    """Creates a reply to an existing email. Uses the original email's
+    thread and subject. Only use IDs from get_emails/search_emails."""
+    data = await _api("POST", f"/api/gmail/reply/{email_id}", {
+        "text": text
     })
     return json.dumps(data)
 
 
 @function_tool()
 async def forward_email(email_id: str, to: str, text: str = "") -> str:
-    """Forwards an email to another recipient."""
-    data = await _api("POST", f"/api/gmail/forward/{email_id}", {"to": to, "text": text})
+    """Forwards an email to another recipient with optional additional text."""
+    data = await _api("POST", f"/api/gmail/forward/{email_id}", {
+        "to": to, "text": text
+    })
     return json.dumps(data)
 
 
 @function_tool()
-async def delete_email(email_id: str) -> str:
-    """Deletes or trashes an email in Gmail."""
-    data = await _api("POST", "/api/gmail/delete", {"emailId": email_id})
+async def list_drafts(max_results: int = 5) -> str:
+    """Lists saved draft emails."""
+    data = await _api("GET", f"/api/gmail/drafts?maxResults={max_results}")
     return json.dumps(data)
 
+
+@function_tool()
+async def send_draft(draft_id: str) -> str:
+    """Sends an existing draft by its ID. The draft must already exist."""
+    data = await _api("POST", f"/api/gmail/drafts/{draft_id}/send", {})
+    return json.dumps(data)
+
+
+@function_tool()
+async def update_draft(
+    draft_id: str, to: str = "", subject: str = "",
+    text: str = "", cc: str = "", bcc: str = ""
+) -> str:
+    """Updates an existing draft with new content."""
+    body = {}
+    if to:
+        body["to"] = to
+    if subject:
+        body["subject"] = subject
+    if text:
+        body["text"] = text
+    if cc:
+        body["cc"] = cc
+    if bcc:
+        body["bcc"] = bcc
+    data = await _api("PUT", f"/api/gmail/drafts/{draft_id}", body)
+    return json.dumps(data)
+
+
+@function_tool()
+async def delete_draft(draft_id: str) -> str:
+    """Deletes a draft email."""
+    data = await _api("DELETE", f"/api/gmail/drafts/{draft_id}")
+    return json.dumps(data)
+
+
+# ──────────────────────────────────────────────────────────────
+# Gmail — Organization & Labels
+# ──────────────────────────────────────────────────────────────
 
 @function_tool()
 async def mark_email_read(email_id: str) -> str:
@@ -87,9 +190,62 @@ async def mark_email_read(email_id: str) -> str:
 
 
 @function_tool()
+async def mark_email_unread(email_id: str) -> str:
+    """Marks an email as unread."""
+    data = await _api("POST", "/api/gmail/mark-unread", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
+async def star_email(email_id: str) -> str:
+    """Stars an email to mark it as important."""
+    data = await _api("POST", "/api/gmail/star", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
+async def unstar_email(email_id: str) -> str:
+    """Removes the star from an email."""
+    data = await _api("POST", "/api/gmail/unstar", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
 async def archive_email(email_id: str) -> str:
-    """Archives an email (removes from Inbox)."""
+    """Archives an email (removes from Inbox but keeps in All Mail)."""
     data = await _api("POST", "/api/gmail/archive", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
+async def delete_email(email_id: str) -> str:
+    """Moves an email to Trash."""
+    data = await _api("POST", "/api/gmail/delete", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
+async def mark_email_important(email_id: str) -> str:
+    """Marks an email as important."""
+    data = await _api("POST", "/api/gmail/mark-important", {"emailId": email_id})
+    return json.dumps(data)
+
+
+@function_tool()
+async def mark_email_spam(email_id: str) -> str:
+    """Marks an email as spam and removes it from inbox."""
+    data = await _api("POST", "/api/gmail/mark-spam", {"emailId": email_id})
+    return json.dumps(data)
+
+
+# ──────────────────────────────────────────────────────────────
+# Gmail — Summarize
+# ──────────────────────────────────────────────────────────────
+
+@function_tool()
+async def summarize_emails(max_results: int = 10) -> str:
+    """Gets a quick summary/snippets of recent inbox emails."""
+    data = await _api("POST", "/api/gmail/summarize", {"maxResults": max_results})
     return json.dumps(data)
 
 
@@ -137,7 +293,9 @@ async def list_calendar_events(
 @function_tool()
 async def web_search(query: str, max_results: int = 5) -> str:
     """Search the web for any information, news, or results."""
-    data = await _api("POST", "/api/search", {"query": query, "maxResults": max_results})
+    data = await _api("POST", "/api/search", {
+        "query": query, "maxResults": max_results
+    })
     return json.dumps(data)
 
 
@@ -147,13 +305,22 @@ async def deep_search(query: str, max_results: int = 8) -> str:
     news, and factual sources for thorough results on any topic."""
     results = {"web": [], "news": [], "facts": None}
 
-    # Run parallel searches via backend
-    web_data = await _api("POST", "/api/search", {"query": query, "maxResults": max_results})
-    news_data = await _api("POST", "/api/news", {"category": query, "maxResults": 3})
+    web_data = await _api("POST", "/api/search", {
+        "query": query, "maxResults": max_results
+    })
+    news_data = await _api("POST", "/api/news", {
+        "category": query, "maxResults": 3
+    })
     facts_data = await _api("POST", "/api/search/facts", {"query": query})
 
-    results["web"] = web_data if isinstance(web_data, list) else web_data.get("results", [])
-    results["news"] = news_data if isinstance(news_data, list) else news_data.get("articles", [])
+    results["web"] = (
+        web_data if isinstance(web_data, list)
+        else web_data.get("results", [])
+    )
+    results["news"] = (
+        news_data if isinstance(news_data, list)
+        else news_data.get("articles", [])
+    )
     results["facts"] = facts_data
 
     return json.dumps(results)
@@ -170,21 +337,27 @@ async def browse_url(url: str) -> str:
 @function_tool()
 async def get_news(topic: str, max_results: int = 5) -> str:
     """Retrieves latest news articles on a specific topic."""
-    data = await _api("POST", "/api/news", {"category": topic, "maxResults": max_results})
+    data = await _api("POST", "/api/news", {
+        "category": topic, "maxResults": max_results
+    })
     return json.dumps(data)
 
 
 @function_tool()
 async def search_images(query: str, max_results: int = 5) -> str:
     """Searches for images on the web."""
-    data = await _api("POST", "/api/search/images", {"query": query, "maxResults": max_results})
+    data = await _api("POST", "/api/search/images", {
+        "query": query, "maxResults": max_results
+    })
     return json.dumps(data)
 
 
 @function_tool()
 async def search_videos(query: str, max_results: int = 5) -> str:
     """Searches for videos on YouTube or the web."""
-    data = await _api("POST", "/api/search/videos", {"query": query, "maxResults": max_results})
+    data = await _api("POST", "/api/search/videos", {
+        "query": query, "maxResults": max_results
+    })
     return json.dumps(data)
 
 
@@ -202,7 +375,9 @@ async def wikipedia_search(query: str) -> str:
 @function_tool()
 async def get_weather(location: str, units: str = "metric") -> str:
     """Retrieves current weather for a location."""
-    data = await _api("POST", "/api/weather", {"location": location, "units": units})
+    data = await _api("POST", "/api/weather", {
+        "location": location, "units": units
+    })
     return json.dumps(data)
 
 
@@ -214,7 +389,9 @@ async def calculate(expression: str) -> str:
 
 
 @function_tool()
-async def convert_currency(amount: float, from_currency: str, to_currency: str) -> str:
+async def convert_currency(
+    amount: float, from_currency: str, to_currency: str
+) -> str:
     """Converts an amount from one currency to another."""
     data = await _api("POST", "/api/currency", {
         "amount": amount, "from": from_currency, "to": to_currency
@@ -223,7 +400,9 @@ async def convert_currency(amount: float, from_currency: str, to_currency: str) 
 
 
 @function_tool()
-async def translate_text(text: str, target_lang: str, source_lang: str = "") -> str:
+async def translate_text(
+    text: str, target_lang: str, source_lang: str = ""
+) -> str:
     """Translates text to a target language."""
     body = {"text": text, "targetLanguage": target_lang}
     if source_lang:
@@ -242,7 +421,9 @@ async def get_stock_price(symbol: str) -> str:
 @function_tool()
 async def get_crypto_price(symbol: str, currency: str = "usd") -> str:
     """Gets current cryptocurrency price."""
-    data = await _api("POST", "/api/crypto", {"symbol": symbol, "currency": currency})
+    data = await _api("POST", "/api/crypto", {
+        "symbol": symbol, "currency": currency
+    })
     return json.dumps(data)
 
 
@@ -265,7 +446,9 @@ async def get_definition(word: str) -> str:
 # ──────────────────────────────────────────────────────────────
 
 @function_tool()
-async def analyze_image(image_description: str, query: str = "Describe what you see") -> str:
+async def analyze_image(
+    image_description: str, query: str = "Describe what you see"
+) -> str:
     """Analyzes an image that was shared or described by the user.
     For images sent via the LiveKit video track, the agent can see them directly.
     Use this for explicit image analysis requests."""
@@ -278,12 +461,24 @@ async def analyze_image(image_description: str, query: str = "Describe what you 
 
 # Collect all tools for export
 ALL_TOOLS = [
-    get_emails, get_email_by_id, search_emails, create_draft,
-    forward_email, delete_email, mark_email_read, archive_email,
+    # Gmail — Auth
+    check_gmail_connection,
+    # Gmail — Reading
+    get_emails, get_email_by_id, search_emails, summarize_emails,
+    # Gmail — Composing
+    create_draft, reply_to_email, forward_email,
+    list_drafts, send_draft, update_draft, delete_draft,
+    # Gmail — Organization
+    mark_email_read, mark_email_unread, star_email, unstar_email,
+    archive_email, delete_email, mark_email_important, mark_email_spam,
+    # Calendar
     create_calendar_event, list_calendar_events,
+    # Search & Browsing
     web_search, deep_search, browse_url, get_news,
     search_images, search_videos, wikipedia_search,
+    # Utilities
     get_weather, calculate, convert_currency, translate_text,
     get_stock_price, get_crypto_price, get_time, get_definition,
+    # Multi-modal
     analyze_image,
 ]

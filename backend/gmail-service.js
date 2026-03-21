@@ -156,17 +156,22 @@ class GmailService {
 
   // ==================== EMAIL READ OPERATIONS ====================
 
-  async getRecentEmails(maxResults = 50) {
+  async getRecentEmails(maxResults = 50, pageToken = null, query = 'in:inbox') {
     if (!this.gmail) throw new Error('Gmail not authenticated');
 
     try {
-      const response = await this.gmail.users.messages.list({
+      const listParams = {
         userId: 'me',
         maxResults,
-        q: 'in:inbox'
-      });
+        q: query
+      };
+      if (pageToken) {
+        listParams.pageToken = pageToken;
+      }
 
-      if (!response.data.messages) return [];
+      const response = await this.gmail.users.messages.list(listParams);
+
+      if (!response.data.messages) return { emails: [], nextPageToken: null };
 
       const messagePromises = response.data.messages
         .slice(0, Math.min(maxResults, 50))
@@ -176,7 +181,10 @@ class GmailService {
         }));
 
       const emails = (await Promise.all(messagePromises)).filter(e => e !== null);
-      return emails;
+      return {
+        emails,
+        nextPageToken: response.data.nextPageToken || null
+      };
     } catch (error) {
       console.error('Failed to get emails:', error?.message || error);
       throw new Error(`Failed to retrieve emails: ${error?.message || 'Unknown error'}`);
