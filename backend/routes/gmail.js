@@ -73,21 +73,36 @@ export const createGmailRouter = (gmailService) => {
         }
     });
 
+    router.get('/auth-status', async (req, res) => {
+        try {
+            const isConnected = !!gmailService.gmail;
+            const authUrl = !isConnected ? await gmailService.getAuthUrl().catch(() => null) : null;
+            res.json({ connected: isConnected, authUrl });
+        } catch (error) {
+            res.json({ connected: false, error: error.message });
+        }
+    });
+
     router.get('/emails', ensureAuth, async (req, res) => {
         console.log('\n═══════════════════════════════════════════════════════════════');
         console.log('📧 [Gmail API] GET /emails - Fetching emails from Gmail');
-        console.log(`📋 Parameters: maxResults=${req.query.maxResults || 10}`);
+        console.log(`📋 Parameters: maxResults=${req.query.maxResults || 10}, pageToken=${req.query.pageToken || 'none'}`);
         console.log('═══════════════════════════════════════════════════════════════');
         try {
             const maxResults = parseInt(req.query.maxResults) || 10;
-            const emails = await gmailService.getRecentEmails(maxResults);
+            const pageToken = req.query.pageToken || null;
+            const query = req.query.query || 'in:inbox';
+            const result = await gmailService.getRecentEmails(maxResults, pageToken, query);
+            const emails = result.emails || result;
+            const nextPageToken = result.nextPageToken || null;
             console.log(`✅ [Gmail API] Successfully fetched ${emails?.length || 0} emails`);
             if (emails?.length > 0) {
                 console.log('📬 Email subjects:');
                 emails.slice(0, 5).forEach((e, i) => console.log(`   ${i + 1}. ${e.subject || '(no subject)'}`));
             }
+            if (nextPageToken) console.log(`📄 Next page token: ${nextPageToken.substring(0, 20)}...`);
             console.log('═══════════════════════════════════════════════════════════════\n');
-            res.json({ emails });
+            res.json({ emails, nextPageToken });
         } catch (error) {
             console.error('❌ [Gmail API] Failed to fetch emails:', error.message);
             console.log('═══════════════════════════════════════════════════════════════\n');
@@ -235,6 +250,36 @@ export const createGmailRouter = (gmailService) => {
         try {
             const { emailId } = req.body;
             const result = await gmailService.archiveEmail(emailId);
+            res.json({ success: true, result });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/unstar', ensureAuth, async (req, res) => {
+        try {
+            const { emailId } = req.body;
+            const result = await gmailService.unstarEmail(emailId);
+            res.json({ success: true, result });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/mark-important', ensureAuth, async (req, res) => {
+        try {
+            const { emailId } = req.body;
+            const result = await gmailService.markAsImportant(emailId);
+            res.json({ success: true, result });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    });
+
+    router.post('/mark-spam', ensureAuth, async (req, res) => {
+        try {
+            const { emailId } = req.body;
+            const result = await gmailService.markAsSpam(emailId);
             res.json({ success: true, result });
         } catch (error) {
             res.status(500).json({ error: error.message });
