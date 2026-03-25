@@ -256,7 +256,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 turn_detection=MultilingualModel(),
                 interruption={
                     "resume_false_interruption": True,
-                    "false_interruption_timeout": 1.0,
+                    "false_interruption_timeout": 0.5,
                 },
             ),
         )
@@ -272,7 +272,7 @@ async def entrypoint(ctx: JobContext) -> None:
                 turn_detection=MultilingualModel(),
                 interruption={
                     "resume_false_interruption": True,
-                    "false_interruption_timeout": 1.0,
+                    "false_interruption_timeout": 0.5,
                 },
             ),
             preemptive_generation=True,

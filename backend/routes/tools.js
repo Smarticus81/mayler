@@ -33,9 +33,17 @@ export const createToolsRouter = (gmailService, utilityService, searchService) =
             }
 
             // ── Gmail Operations ──
+            case 'check_gmail_connection': {
+                const isConnected = !!gmailService.gmail;
+                const authUrl = !isConnected ? await gmailService.getAuthUrl().catch(() => null) : null;
+                return { result: JSON.stringify({ connected: isConnected, authUrl }) };
+            }
+
             case 'get_emails': {
                 const maxResults = Number(args.maxResults) || 5;
-                const resp = await gmailService.getEmails(maxResults);
+                const query = args.query || 'in:inbox';
+                const pageToken = args.pageToken || '';
+                const resp = await gmailService.getRecentEmails(maxResults, pageToken, query);
                 // Register valid IDs
                 registry.validIds.clear();
                 registry.lastFetchTime = Date.now();
@@ -92,11 +100,33 @@ export const createToolsRouter = (gmailService, utilityService, searchService) =
                 return { result: `Draft sent. ${JSON.stringify(resp)}` };
             }
 
+            case 'reply_to_email': {
+                const emailId = String(args.emailId || '');
+                if (!emailId) return { result: 'No email ID provided. Call get_emails first.' };
+                const resp = await gmailService.replyToEmail(emailId, args.text);
+                return { result: JSON.stringify(resp) };
+            }
+
+            case 'update_draft': {
+                const resp = await gmailService.updateDraft(String(args.draftId), {
+                    to: args.to, subject: args.subject, text: args.text, cc: args.cc, bcc: args.bcc
+                });
+                return { result: JSON.stringify(resp) };
+            }
+
+            case 'delete_draft': {
+                const resp = await gmailService.deleteDraft(String(args.draftId));
+                return { result: JSON.stringify(resp) };
+            }
+
             case 'delete_email':
             case 'mark_email_read':
             case 'mark_email_unread':
             case 'star_email':
-            case 'archive_email': {
+            case 'unstar_email':
+            case 'archive_email':
+            case 'mark_email_important':
+            case 'mark_email_spam': {
                 const emailId = String(args.emailId || '');
                 if (!emailId) return { result: 'No email ID provided. Call get_emails first.' };
                 const methodMap = {
@@ -104,7 +134,10 @@ export const createToolsRouter = (gmailService, utilityService, searchService) =
                     mark_email_read: 'markAsRead',
                     mark_email_unread: 'markAsUnread',
                     star_email: 'starEmail',
+                    unstar_email: 'unstarEmail',
                     archive_email: 'archiveEmail',
+                    mark_email_important: 'markAsImportant',
+                    mark_email_spam: 'markAsSpam',
                 };
                 const method = methodMap[name];
                 if (gmailService[method]) {

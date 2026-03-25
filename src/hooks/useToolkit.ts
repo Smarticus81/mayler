@@ -64,6 +64,10 @@ export const useToolkit = () => {
                     }
                     return data;
                 }
+                case 'check_gmail_connection': {
+                    const resp = await fetch('/api/gmail/auth-status');
+                    return await safeJson(resp);
+                }
                 case 'create_calendar_event': {
                     const resp = await fetch('/api/calendar/events', {
                         method: 'POST',
@@ -83,7 +87,13 @@ export const useToolkit = () => {
                 }
                 case 'get_emails': {
                     const maxResults = (a.maxResults as number | undefined) ?? 5;
-                    const resp = await fetch(`/api/gmail/emails?maxResults=${encodeURIComponent(String(maxResults))}`);
+                    const query = (a.query as string | undefined) || 'in:inbox';
+                    const pageToken = (a.pageToken as string | undefined) || '';
+                    const params = new URLSearchParams();
+                    params.set('maxResults', String(maxResults));
+                    params.set('query', query);
+                    if (pageToken) params.set('pageToken', pageToken);
+                    const resp = await fetch(`/api/gmail/emails?${params.toString()}`);
                     const data = await safeJson(resp);
 
                     // ═══════════════════════════════════════════════════════════════
@@ -223,7 +233,10 @@ export const useToolkit = () => {
                 case 'mark_email_read':
                 case 'mark_email_unread':
                 case 'star_email':
-                case 'archive_email': {
+                case 'unstar_email':
+                case 'archive_email':
+                case 'mark_email_important':
+                case 'mark_email_spam': {
                     const emailId = a.emailId as string;
 
                     // 🛡️ STRICT: Validate email ID before any operation
@@ -250,7 +263,10 @@ export const useToolkit = () => {
                         'mark_email_read': '/api/gmail/mark-read',
                         'mark_email_unread': '/api/gmail/mark-unread',
                         'star_email': '/api/gmail/star',
+                        'unstar_email': '/api/gmail/unstar',
                         'archive_email': '/api/gmail/archive',
+                        'mark_email_important': '/api/gmail/mark-important',
+                        'mark_email_spam': '/api/gmail/mark-spam',
                     };
 
                     const resp = await fetch(endpointMap[name], {
@@ -564,17 +580,20 @@ export const useToolkit = () => {
         { type: 'function', name: 'google_auth_setup', description: 'Opens an OAuth window for the user to authenticate with Google, granting access to Gmail and Calendar. Call this when the user wants to connect their Google account. The window will open automatically.', parameters: { type: 'object', properties: {} } },
 
         // Gmail CRUD Operations
-        { type: 'function', name: 'get_emails', description: "Gets email list with METADATA ONLY. Returns array of emails, each with: id (string), subject, from, date, snippet. Does NOT return full bodies. IMPORTANT: Use the 'id' field from this response to call get_email_by_id. CRITICAL: When you finish processing all emails in a batch, you MUST call get_emails AGAIN to fetch the next batch. NEVER fabricate or guess email IDs - the ONLY way to get more email IDs is to call this function again. Example: after processing 5 emails, call get_emails to get the next 5.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5, description: 'Number of emails to fetch. Call again to get next batch.' } } } },
+        { type: 'function', name: 'check_gmail_connection', description: 'Checks if Gmail is connected and authenticated. Returns connection status and an auth URL if not connected. Call this before any email operation if the user has not connected Gmail yet.', parameters: { type: 'object', properties: {} } },
+        { type: 'function', name: 'get_emails', description: "Gets email list with METADATA ONLY. Returns array of emails, each with: id (string), subject, from, date, snippet, and a nextPageToken for pagination. Does NOT return full bodies. IMPORTANT: Use the 'id' field from this response to call get_email_by_id. CRITICAL: When you finish processing all emails in a batch, you MUST call get_emails AGAIN with the pageToken to fetch the next batch. NEVER fabricate or guess email IDs.", parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5, description: 'Number of emails to fetch (1-20).' }, pageToken: { type: 'string', description: 'Token from a previous get_emails response to get the NEXT page. Leave empty for first page.' }, query: { type: 'string', default: 'in:inbox', description: "Gmail search query. Examples: 'is:unread', 'from:someone@gmail.com', 'subject:invoice', 'newer_than:1d', 'has:attachment'." } } } },
         { type: 'function', name: 'get_email_by_id', description: 'Gets FULL email content by ID. CRITICAL: Only use email IDs from get_emails response. The ID must be the exact string from the "id" field in get_emails. NEVER guess or modify IDs.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'EXACT email ID from get_emails response (e.g., "19b6a88c857268d9")' } }, required: ['emailId'] } },
         { type: 'function', name: 'search_emails', description: 'Searches emails in Gmail with a query. Returns METADATA only, not full bodies.', parameters: { type: 'object', properties: { query: { type: 'string' }, maxResults: { type: 'number', default: 5 } }, required: ['query'] } },
-        { type: 'function', name: 'send_email', description: 'DEPRECATED - Use create_draft instead. This tool is disabled for safety.', parameters: { type: 'object', properties: {} } },
-        { type: 'function', name: 'reply_to_email', description: 'DEPRECATED - Use create_draft instead. This tool is disabled for safety. To reply to an email, create a draft with the appropriate subject and recipient.', parameters: { type: 'object', properties: {} } },
+        { type: 'function', name: 'reply_to_email', description: 'Creates a threaded reply to an existing email. Uses the original email thread and subject. Only use IDs from get_emails/search_emails. The reply is sent as part of the thread.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'EXACT email ID from get_emails/search_emails response' }, text: { type: 'string', description: 'Reply body text' } }, required: ['emailId', 'text'] } },
         { type: 'function', name: 'summarize_emails', description: 'Gets and summarizes recent emails. Call this when user wants email summary.', parameters: { type: 'object', properties: { maxResults: { type: 'number', default: 5 } } } },
         { type: 'function', name: 'delete_email', description: 'Deletes or trashes an email in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'mark_email_read', description: 'Marks an email as read in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'mark_email_unread', description: 'Marks an email as unread in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'star_email', description: 'Stars an email in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
         { type: 'function', name: 'archive_email', description: 'Archives an email (removes from Inbox) in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
+        { type: 'function', name: 'unstar_email', description: 'Removes the star from an email in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
+        { type: 'function', name: 'mark_email_important', description: 'Marks an email as important in Gmail.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
+        { type: 'function', name: 'mark_email_spam', description: 'Marks an email as spam and removes it from inbox.', parameters: { type: 'object', properties: { emailId: { type: 'string', description: 'REAL hex ID from tool result. DO NOT HALLUCINATE.' } }, required: ['emailId'] } },
 
         // Draft Operations
         { type: 'function', name: 'create_draft', description: 'Creates and SAVES a draft email (does NOT send). Use this when user wants to draft/compose an email for later.', parameters: { type: 'object', properties: { to: { type: 'string', description: 'Recipient email address' }, subject: { type: 'string', description: 'Email subject' }, text: { type: 'string', description: 'Email body text' }, cc: { type: 'string' }, bcc: { type: 'string' } }, required: ['to', 'subject', 'text'] } },
