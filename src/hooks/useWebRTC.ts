@@ -4,6 +4,11 @@ import { useToolkit } from './useToolkit';
 import { asObject, asString } from '../utils/jsonUtils';
 import type { JSONObject } from '../types';
 
+/**
+ * OpenAI Realtime Voice Pipeline — WebRTC hook.
+ * Implements the full spec: ephemeral tokens, data channel protocol,
+ * tool call round-trip via /api/tools, interruption handling, and cleanup.
+ */
 export const useWebRTC = () => {
     const {
         setConnected,
@@ -16,11 +21,14 @@ export const useWebRTC = () => {
         setAgentTranscript,
         setAgentInterimTranscript,
         selectedVoice,
+        voiceSpeed,
         setIsWakeMode,
+        setAppMode,
+        setAgentState,
         addChatMessage,
     } = useMayler();
 
-    const { runTool, toolkitDefinitions } = useToolkit();
+    const { toolkitDefinitions } = useToolkit();
 
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const dcRef = useRef<RTCDataChannel | null>(null);
@@ -28,12 +36,10 @@ export const useWebRTC = () => {
     const remoteAudioElRef = useRef<HTMLAudioElement | null>(null);
 
     const shouldGreetOnConnectRef = useRef<boolean>(false);
-    const activeResponseRef = useRef(false);
+    const sessionIdRef = useRef<string | null>(null);
     const [audioLevel, setAudioLevel] = useState(0);
 
     // Use a ref to track speaking state for the dc.onmessage closure.
-    // State variables captured in the closure become stale since connect()
-    // only runs once, but the onmessage handler persists for the session.
     const speakingRef = useRef(false);
     speakingRef.current = speaking;
 
@@ -43,107 +49,50 @@ export const useWebRTC = () => {
     }, []);
 
     const configureSession = useCallback(() => {
-        const modalities = ['text', 'audio'];
-
         sendEvent({
             type: 'session.update',
             session: {
                 instructions: `You are Mayler, a professional email assistant.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 CRITICAL SAFETY RULES - NEVER VIOLATE THESE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Persona:
+- Professional, warm, caring tone
+- One or two sentences max per response
+- Enthusiastic and proactive
 
-1. NEVER send emails automatically - ONLY create drafts
-2. NEVER use send_email or reply_to_email - they are DISABLED
-3. ONLY use email IDs that appear in tool responses
-4. NEVER guess, fabricate, or modify email IDs
-5. If an ID doesn't work, STOP - don't try similar IDs
-6. Process emails continuously WITHOUT asking permission
-7. NEVER ask "would you like me to continue" or "anything else"
+Rules:
+- NEVER send emails automatically - ONLY create drafts
+- ONLY use email IDs that appear in tool responses
+- NEVER guess, fabricate, or modify email IDs
+- Process emails continuously WITHOUT asking permission
+- NEVER ask "would you like me to continue" or "anything else"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EMAIL WORKFLOW:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+Email Workflow:
 1. Call get_emails - returns metadata with 'id' field
-2. For each email in the response:
-   - Call get_email_by_id with EXACT id from step 1
-   - If it fails (404), SKIP IT - don't try other IDs
-   - Process the email content
-   - Move to next email automatically
-3. ⚠️ WHEN BATCH IS EXHAUSTED: Call get_emails AGAIN for next batch
-4. Repeat until all emails processed
+2. For each email: call get_email_by_id with EXACT id
+3. When batch exhausted: call get_emails AGAIN for next batch
+4. NEVER fabricate IDs - only way to get more is call get_emails
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🚨 CRITICAL: NEXT BATCH RULES:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-When you finish processing ALL emails in a batch:
-- IMMEDIATELY call get_emails again to fetch the next batch
-- NEVER try to guess or fabricate new email IDs
-- NEVER increment/modify IDs from previous batch
-- The ONLY way to get more emails is: call get_emails
-
-If user wants more emails → call get_emails
-If batch is done → call get_emails
-If you need new IDs → call get_emails
-
-EXAMPLE - CORRECT:
-get_emails → [{id: "19b6a88c857268d9", ...}, {id: "19b6a6c62648ba28", ...}]
-get_email_by_id(emailId: "19b6a88c857268d9") ✅
-get_email_by_id(emailId: "19b6a6c62648ba28") ✅
-→ Batch done! Call get_emails again for next batch ✅
-
-EXAMPLE - WRONG:
-get_emails → [{id: "19b6a88c857268d9", ...}]
-→ Batch done, trying to continue with made-up IDs:
-get_email_by_id(emailId: "19b6a88c857268d8") ❌ FABRICATED!
-get_email_by_id(emailId: "19b6a88c857268d7") ❌ FABRICATED!
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-COMPOSING EMAILS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+Composing:
 - ALWAYS use create_draft (never send_email or reply_to_email)
-- Draft will be saved for user to review and send manually
 - Tell user "I've created a draft for you to review"
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-LANGUAGE:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+Language:
 - ALWAYS respond in English only
-- NEVER switch languages mid-response
-- Even if user speaks another language, respond in English
 - Maintain consistent English throughout the entire session
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-PERSONALITY:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-- Professional, warm, caring
-- Enthusiastic and proactive
-- Process emails continuously
-- NEVER ask permission to continue
-- NEVER say "anything else" or "would you like me to"
-- Just move to next email automatically
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-TERMINATION:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+Termination:
 - "goodbye"/"bye" → Say farewell and STOP
 - "shut down"/"stop listening" → Say "Shutting down" and STOP`,
-                modalities: modalities,
+                modalities: ['text', 'audio'],
                 input_audio_transcription: { model: 'gpt-4o-transcribe' },
                 turn_detection: {
                     type: 'server_vad',
-                    threshold: 0.5,
-                    prefix_padding_ms: 300,
-                    silence_duration_ms: 800,
+                    threshold: 0.35,
+                    prefix_padding_ms: 200,
+                    silence_duration_ms: 400,
+                    create_response: true,
                 },
-                temperature: 0.8,
+                temperature: 0.6,
                 max_response_output_tokens: 4096,
                 voice: selectedVoice,
                 tools: toolkitDefinitions,
@@ -152,67 +101,119 @@ TERMINATION:
     }, [sendEvent, selectedVoice, toolkitDefinitions]);
 
     const disconnect = useCallback(() => {
-        dcRef.current?.close();
-        pcRef.current?.close();
+        // 1. Stop all media tracks (mic)
+        pcRef.current?.getSenders().forEach(sender => {
+            sender.track?.stop();
+        });
         localStreamRef.current?.getTracks().forEach(t => t.stop());
+
+        // 2. Close data channel
+        dcRef.current?.close();
+        dcRef.current = null;
+
+        // 3. Close peer connection
+        pcRef.current?.close();
+        pcRef.current = null;
+
+        // 4. Clean up audio element
+        if (remoteAudioElRef.current) {
+            remoteAudioElRef.current.srcObject = null;
+        }
+
         setConnected(false);
         setSpeaking(false);
         setListening(false);
-    }, [setConnected, setSpeaking, setListening]);
+        setAgentState('disconnected');
+        sessionIdRef.current = null;
+    }, [setConnected, setSpeaking, setListening, setAgentState]);
 
+    /** Interrupt the agent (cancel current response) */
+    const interrupt = useCallback(() => {
+        if (dcRef.current?.readyState === 'open') {
+            sendEvent({ type: 'response.cancel' });
+        }
+    }, [sendEvent]);
+
+    /**
+     * Tool call round-trip per spec:
+     * 1. POST to /api/tools server endpoint
+     * 2. Send tool result back via data channel
+     * 3. Send response.create to trigger agent response
+     */
     const handleFunctionCall = useCallback(async (call_id: string, name: string, rawArgs: unknown) => {
-        // ═══════════════════════════════════════════════════════════════════
-        // 📡 AGENT FUNCTION CALL RECEIVED
-        // ═══════════════════════════════════════════════════════════════════
-        console.log(`\n%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, 'color: #a78bfa');
-        console.log(`%c📡 AGENT FUNCTION CALL RECEIVED`, 'color: #a78bfa; font-weight: bold; font-size: 14px');
-        console.log(`%cCall ID: ${call_id}`, 'color: #94a3b8');
-        console.log(`%cFunction: ${name}`, 'color: #fbbf24; font-weight: bold');
-        console.log(`%cRaw Arguments:`, 'color: #94a3b8');
-        console.log(rawArgs);
-        console.log(`%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`, 'color: #a78bfa');
+        console.log(`[WebRTC] Tool call: ${name}`, rawArgs);
 
         let args: unknown = rawArgs;
         if (typeof rawArgs === 'string') {
-            try {
-                args = JSON.parse(rawArgs);
-            } catch {
-                args = { raw: rawArgs };
+            try { args = JSON.parse(rawArgs); } catch { args = { raw: rawArgs }; }
+        }
+
+        try {
+            // 1. POST to server-side tool execution endpoint
+            const res = await fetch('/api/tools', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: sessionIdRef.current || 'default',
+                    tool_name: name,
+                    arguments: args,
+                }),
+            });
+            const data = await res.json();
+
+            // 2. Send tool result back to OpenAI via data channel
+            sendEvent({
+                type: 'conversation.item.create',
+                item: {
+                    type: 'function_call_output',
+                    call_id,
+                    output: data.result ?? 'Tool execution failed',
+                },
+            });
+
+            // 3. CRITICAL: Tell OpenAI to generate a response from the tool result
+            sendEvent({ type: 'response.create' });
+
+            // 4. Handle structured commands for client UI
+            if (data.command) {
+                if (data.command.type === 'disconnect') {
+                    setTimeout(() => disconnect(), 2000);
+                } else if (data.command.type === 'oauth' && data.command.authUrl) {
+                    window.open(data.command.authUrl, 'Google Authentication', 'width=600,height=700');
+                }
             }
+        } catch (e: any) {
+            // On error, still send a result so the agent can respond gracefully
+            sendEvent({
+                type: 'conversation.item.create',
+                item: {
+                    type: 'function_call_output',
+                    call_id,
+                    output: `Error: ${e.message}`,
+                },
+            });
+            sendEvent({ type: 'response.create' });
         }
-
-        const result = await runTool(name, args);
-
-        if (name === 'disconnect_session') {
-            // We perform the physical disconnect after a short delay 
-            // to allow the model to speak a goodbye if it wants
-            setTimeout(() => disconnect(), 500);
-        }
-
-        sendEvent({
-            type: 'conversation.item.create',
-            item: {
-                type: 'function_call_output',
-                call_id,
-                output: JSON.stringify(result),
-            },
-        });
-        sendEvent({ type: 'response.create' });
-    }, [runTool, sendEvent, disconnect]);
+    }, [sendEvent, disconnect]);
 
     const connect = useCallback(async (shouldGreet = false) => {
         setLoading(true);
         setError('');
+        setAgentState('connecting');
         shouldGreetOnConnectRef.current = shouldGreet;
 
         try {
-            const tokenResp = await fetch('/api/token', { method: 'POST' });
+            // ── Step 1: Get ephemeral token from server ──
+            const tokenResp = await fetch('/api/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ voice: selectedVoice, speed: voiceSpeed }),
+            });
             const tokenJson = await tokenResp.json();
             const tokenData = asObject(tokenJson);
-            console.log('[WebRTC] Token Response:', tokenData);
 
             let token: string | null = null;
-            let modelName = 'gpt-4o-mini-realtime-preview'; // fallback
+            let modelName = 'gpt-4o-mini-realtime-preview-2024-12-17';
 
             if (tokenData) {
                 const clientSecret = asObject(tokenData.client_secret);
@@ -226,12 +227,11 @@ TERMINATION:
                 throw new Error('Failed to get realtime token');
             }
 
-            const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-            });
+            // ── Step 2: Create RTCPeerConnection ──
+            const pc = new RTCPeerConnection();
             pcRef.current = pc;
 
-            // Handle incoming tracks from OpenAI
+            // ── Step 3: Set up audio playback ──
             pc.ontrack = (e) => {
                 const stream = e.streams[0];
                 if (remoteAudioElRef.current) {
@@ -255,15 +255,12 @@ TERMINATION:
                             return;
                         }
                         analyser.getByteFrequencyData(dataArray);
-                        // Calculate average volume
                         let sum = 0;
                         for (let i = 0; i < dataArray.length; i++) {
                             sum += dataArray[i];
                         }
                         const average = sum / dataArray.length;
-                        // Normalize to 0-1 range roughly
-                        // 0-255 -> 0-1
-                        setAudioLevel(Math.min(1, average / 50)); // boost sensitivity
+                        setAudioLevel(Math.min(1, average / 50));
                         requestAnimationFrame(updateLevel);
                     };
                     updateLevel();
@@ -272,13 +269,26 @@ TERMINATION:
                 }
             };
 
-            const dc = pc.createDataChannel('oai-events', { ordered: true });
+            // ── Step 4: Add local microphone track ──
+            // CRITICAL: echoCancellation prevents feedback loops
+            const ms = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                },
+            });
+            localStreamRef.current = ms;
+            ms.getTracks().forEach(track => pc.addTrack(track, ms));
 
+            // ── Step 5: Create data channel for events ──
+            const dc = pc.createDataChannel('oai-events', { ordered: true });
             dcRef.current = dc;
 
             dc.onopen = () => {
                 setConnected(true);
                 setLoading(false);
+                setAgentState('listening');
                 configureSession();
 
                 if (shouldGreetOnConnectRef.current) {
@@ -295,116 +305,156 @@ TERMINATION:
                 }
             };
 
+            dc.onclose = () => {
+                setAgentState('disconnected');
+            };
+
             dc.onmessage = (event) => {
                 const msg = asObject(JSON.parse(event.data));
                 if (!msg) return;
 
                 const t = asString(msg.type);
-                if (t === 'error') {
-                    const errObj = asObject(msg.error);
-                    const errMsg = asString(errObj?.message) || 'Realtime error';
-                    // Non-fatal errors from OpenAI (e.g. cancelling when no response active)
-                    if (errMsg.toLowerCase().includes('cancellation failed') ||
-                        errMsg.toLowerCase().includes('no active response')) {
-                        console.warn('[WebRTC] Non-fatal:', errMsg);
-                        return;
-                    }
-                    setError(errMsg);
-                    return;
-                }
 
-                if (t === 'input_audio_buffer.speech_started') {
-                    if (activeResponseRef.current) sendEvent({ type: 'response.cancel' });
-                    setListening(true);
-                }
-                if (t === 'input_audio_buffer.speech_stopped') {
-                    setListening(false);
-                }
+                switch (t) {
+                    // ── Session lifecycle ──
+                    case 'session.created':
+                        sessionIdRef.current = asString(asObject(msg.session)?.id) || null;
+                        setAgentState('listening');
+                        break;
 
-                if (t === 'response.created') {
-                    activeResponseRef.current = true;
-                    setSpeaking(true);
-                }
-                if (t === 'response.done') {
-                    activeResponseRef.current = false;
-                    setSpeaking(false);
-                    setAgentInterimTranscript('');
-                }
+                    case 'session.updated':
+                        // Acknowledgment — no action needed
+                        break;
 
-                if (t === 'response.audio_transcript.delta') {
-                    setAgentInterimTranscript(prev => prev + (asString(msg.delta) || ''));
-                }
-                if (t === 'response.audio_transcript.done' || t === 'response.text.done') {
-                    const text = asString(msg.transcript) || asString(msg.text) || '';
-                    if (text.trim()) {
-                        setAgentTranscript(text);
-                        setAgentInterimTranscript('');
-                        addChatMessage('agent', text);
-
-                        // Check for termination phrases
-                        const lowerText = text.toLowerCase();
-                        const isGoodbye = lowerText.includes('goodbye') || lowerText.includes('bye') || lowerText.includes("that's all");
-                        const isShutdown = lowerText.includes('shut down') || lowerText.includes('shutting down') || lowerText.includes('stop listening');
-
-                        if (isShutdown) {
-                            // Complete shutdown - disable wake word
-                            console.log('🛑 Shutdown detected - disabling wake word');
-                            setTimeout(() => {
-                                disconnect();
-                                setIsWakeMode(false);
-                            }, 1500); // Give time for farewell to play
-                        } else if (isGoodbye) {
-                            // Return to wake word mode
-                            console.log('👋 Goodbye detected - returning to wake word mode');
-                            setTimeout(() => {
-                                disconnect();
-                                setIsWakeMode(true);
-                            }, 1500); // Give time for farewell to play
+                    // ── Voice Activity Detection ──
+                    case 'input_audio_buffer.speech_started':
+                        // User started speaking — cancel if agent is speaking (interruption)
+                        if (speakingRef.current) {
+                            sendEvent({ type: 'response.cancel' });
                         }
+                        setListening(true);
+                        setAgentState('listening');
+                        break;
+
+                    case 'input_audio_buffer.speech_stopped':
+                        setListening(false);
+                        setAgentState('thinking');
+                        break;
+
+                    // ── Transcription ──
+                    case 'response.audio_transcript.delta':
+                        setAgentInterimTranscript(prev => prev + (asString(msg.delta) || ''));
+                        break;
+
+                    case 'conversation.item.input_audio_transcription.completed':
+                    case 'input_audio_transcription.completed': {
+                        const userText = asString(msg.transcript) || '';
+                        setTranscript(userText);
+                        setInterimTranscript('');
+                        if (userText.trim()) addChatMessage('user', userText);
+                        break;
                     }
-                }
 
-                if (t === 'input_audio_transcription.delta') {
-                    setInterimTranscript(prev => prev + (asString(msg.delta) || ''));
-                }
-                if (t === 'input_audio_transcription.completed') {
-                    const userText = asString(msg.transcript) || '';
-                    setTranscript(userText);
-                    setInterimTranscript('');
-                    if (userText.trim()) addChatMessage('user', userText);
-                }
+                    case 'response.audio_transcript.done':
+                    case 'response.text.done': {
+                        const text = asString(msg.transcript) || asString(msg.text) || '';
+                        if (text.trim()) {
+                            setAgentTranscript(text);
+                            setAgentInterimTranscript('');
+                            addChatMessage('agent', text);
 
-                if (t === 'response.output_item.done') {
-                    const item = asObject(msg.item);
-                    if (item && asString(item.type) === 'function_call') {
-                        const callId = asString(item.call_id);
-                        const name = asString(item.name);
-                        const args = item.arguments;
-                        if (callId && name) handleFunctionCall(callId, name, args);
+                            // Check for termination phrases in agent response
+                            const lowerText = text.toLowerCase();
+                            const isShutdown = lowerText.includes('shut down') || lowerText.includes('shutting down') || lowerText.includes('stop listening');
+                            const isGoodbye = lowerText.includes('goodbye') || lowerText.includes('bye') || lowerText.includes("that's all");
+
+                            if (isShutdown) {
+                                setTimeout(() => {
+                                    disconnect();
+                                    setIsWakeMode(false);
+                                    setAppMode('shutdown');
+                                }, 2000);
+                            } else if (isGoodbye) {
+                                setTimeout(() => {
+                                    disconnect();
+                                    setIsWakeMode(true);
+                                    setAppMode('wake_word');
+                                }, 2000);
+                            }
+                        }
+                        break;
+                    }
+
+                    // ── Audio playback ──
+                    case 'response.audio.delta':
+                        setSpeaking(true);
+                        setAgentState('speaking');
+                        break;
+
+                    // ── Response lifecycle ──
+                    case 'response.done':
+                        setSpeaking(false);
+                        setAgentInterimTranscript('');
+                        setAgentState('listening');
+                        break;
+
+                    // ── Tool calls ──
+                    case 'response.function_call_arguments.done': {
+                        const toolName = asString(msg.name);
+                        const callId = asString(msg.call_id);
+                        const args = msg.arguments;
+                        if (callId && toolName) handleFunctionCall(callId, toolName, args);
+                        break;
+                    }
+
+                    case 'response.output_item.done': {
+                        const item = asObject(msg.item);
+                        if (item && asString(item.type) === 'function_call') {
+                            const callId = asString(item.call_id);
+                            const name = asString(item.name);
+                            const args = item.arguments;
+                            if (callId && name) handleFunctionCall(callId, name, args);
+                        }
+                        break;
+                    }
+
+                    case 'input_audio_transcription.delta':
+                        setInterimTranscript(prev => prev + (asString(msg.delta) || ''));
+                        break;
+
+                    // ── Errors ──
+                    case 'error': {
+                        const errObj = asObject(msg.error);
+                        const errMsg = asString(errObj?.message) || 'Realtime error';
+                        // Non-fatal errors
+                        if (errMsg.toLowerCase().includes('cancellation failed') ||
+                            errMsg.toLowerCase().includes('no active response')) {
+                            console.warn('[WebRTC] Non-fatal:', errMsg);
+                            return;
+                        }
+                        setError(errMsg);
+                        setAgentState('error');
+                        break;
                     }
                 }
             };
 
-            const ms = await navigator.mediaDevices.getUserMedia({ audio: true });
-            localStreamRef.current = ms;
-            ms.getTracks().forEach(track => pc.addTrack(track, ms));
-
+            // ── Step 6: Create SDP offer ──
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            // Correct endpoint for WebRTC SDP exchange with standard Realtime API
-            const baseUrl = 'https://api.openai.com/v1/realtime';
-            const modelParam = modelName ? `?model=${modelName}` : '';
-            const url = `${baseUrl}${modelParam}`;
-
-            const sdpResp = await fetch(url, {
-                method: 'POST',
-                body: offer.sdp,
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    'Content-Type': 'application/sdp',
+            // ── Step 7: Send offer to OpenAI, get SDP answer ──
+            const sdpResp = await fetch(
+                `https://api.openai.com/v1/realtime?model=${modelName}`,
+                {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/sdp',
+                    },
+                    body: offer.sdp,
                 },
-            });
+            );
 
             if (!sdpResp.ok) {
                 const errText = await sdpResp.text();
@@ -413,23 +463,20 @@ TERMINATION:
             }
 
             const answerSdp = await sdpResp.text();
-            await pc.setRemoteDescription({
-                type: 'answer',
-                sdp: answerSdp,
-            });
+            await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
         } catch (e: any) {
             console.error('Connection error:', e);
             setError(e.message || 'Failed to connect');
             setLoading(false);
+            setAgentState('error');
         }
-    }, [setConnected, setLoading, setError, configureSession, sendEvent, setSpeaking, setListening, setAgentInterimTranscript, setAgentTranscript, setInterimTranscript, setTranscript, handleFunctionCall, disconnect, setIsWakeMode]);
-
-
+    }, [setConnected, setLoading, setError, setAgentState, configureSession, sendEvent, setSpeaking, setListening, setAgentInterimTranscript, setAgentTranscript, setInterimTranscript, setTranscript, handleFunctionCall, disconnect, setIsWakeMode, setAppMode, selectedVoice, voiceSpeed, addChatMessage]);
 
     return {
         connect,
         disconnect,
+        interrupt,
         sendEvent,
         remoteAudioElRef,
         audioLevel,

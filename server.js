@@ -21,6 +21,7 @@ import { createVisionRouter } from './backend/routes/vision.js';
 import { createBrowsingRouter } from './backend/routes/browsing.js';
 import { createLiveKitRouter } from './backend/routes/livekit.js';
 import { createDeepSearchRouter } from './backend/routes/deep-search.js';
+import { createToolsRouter } from './backend/routes/tools.js';
 
 
 // Load environment variables
@@ -78,6 +79,7 @@ const visionRouter = createVisionRouter();
 const browsingRouter = createBrowsingRouter();
 const livekitRouter = createLiveKitRouter(livekitService);
 const deepSearchRouter = createDeepSearchRouter(searchService);
+const toolsRouter = createToolsRouter(gmailService, utilityService, searchService);
 
 // Mount Routes
 app.use('/api/auth', authRouter);
@@ -92,6 +94,7 @@ app.use('/api/vision', visionRouter);
 app.use('/api/browsing', browsingRouter);
 app.use('/api/livekit', livekitRouter);
 app.use('/api/deep-search', deepSearchRouter);
+app.use('/api/tools', toolsRouter);
 
 // Serve static files in production
 app.use(express.static(path.join(__dirname, 'dist')));

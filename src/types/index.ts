@@ -17,8 +17,22 @@ export type VoicePipeline = 'openai-webrtc' | 'livekit-cloud';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+/** App-level UX state machine per OpenAI Voice Pipeline spec */
+export type AppMode = 'idle' | 'wake_word' | 'command' | 'shutdown';
+
+/** Agent state within command mode */
+export type AgentState = 'disconnected' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
+
+export interface ConversationMessage {
+    id: string;
+    role: 'user' | 'agent';
+    content: string;
+    timestamp: Date;
+}
+
 export interface WebRTCSessionConfig {
     voice: VoiceOption;
+    speed: number;
     instructions: string;
 }
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { ReactNode, Dispatch, SetStateAction } from 'react';
-import type { GoogleStatus, VoiceOption, VoiceEngine, VoicePipeline, ThemeMode, ChatMessage } from '../types';
+import type { GoogleStatus, VoiceOption, VoiceEngine, VoicePipeline, ThemeMode, ChatMessage, AppMode, AgentState } from '../types';
 
 interface MaylerContextType {
     // Connection State
@@ -10,6 +10,12 @@ interface MaylerContextType {
     setLoading: Dispatch<SetStateAction<boolean>>;
     error: string;
     setError: Dispatch<SetStateAction<string>>;
+
+    // App State Machine (per OpenAI Voice Pipeline spec)
+    appMode: AppMode;
+    setAppMode: Dispatch<SetStateAction<AppMode>>;
+    agentState: AgentState;
+    setAgentState: Dispatch<SetStateAction<AgentState>>;
 
     // Interaction State
     speaking: boolean;
@@ -41,6 +47,8 @@ interface MaylerContextType {
     setGoogleStatus: Dispatch<SetStateAction<GoogleStatus>>;
     selectedVoice: VoiceOption;
     setSelectedVoice: Dispatch<SetStateAction<VoiceOption>>;
+    voiceSpeed: number;
+    setVoiceSpeed: Dispatch<SetStateAction<number>>;
     voiceEngine: VoiceEngine;
     setVoiceEngine: Dispatch<SetStateAction<VoiceEngine>>;
     voicePipeline: VoicePipeline;
@@ -63,6 +71,10 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [connected, setConnected] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    // App State Machine (per OpenAI Voice Pipeline spec)
+    const [appMode, setAppMode] = useState<AppMode>('idle');
+    const [agentState, setAgentState] = useState<AgentState>('disconnected');
 
     const [speaking, setSpeaking] = useState(false);
     const [listening, setListening] = useState(false);
@@ -106,6 +118,10 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             return stored as VoiceOption;
         }
         return 'ash';
+    });
+    const [voiceSpeed, setVoiceSpeed] = useState<number>(() => {
+        const stored = localStorage.getItem('mayler_speed');
+        return stored ? parseFloat(stored) : 0.9;
     });
     const [voiceEngine, setVoiceEngine] = useState<VoiceEngine>(() => {
         const stored = localStorage.getItem('mayler_engine');
@@ -155,6 +171,10 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [selectedVoice]);
 
     useEffect(() => {
+        localStorage.setItem('mayler_speed', String(voiceSpeed));
+    }, [voiceSpeed]);
+
+    useEffect(() => {
         localStorage.setItem('mayler_engine', voiceEngine);
     }, [voiceEngine]);
 
@@ -178,6 +198,8 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         connected, setConnected,
         loading, setLoading,
         error, setError,
+        appMode, setAppMode,
+        agentState, setAgentState,
         speaking, setSpeaking,
         listening, setListening,
         isWakeMode, setIsWakeMode,
@@ -189,6 +211,7 @@ export const MaylerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         wakeWordEnabled, setWakeWordEnabled,
         googleStatus, setGoogleStatus,
         selectedVoice, setSelectedVoice,
+        voiceSpeed, setVoiceSpeed,
         voiceEngine, setVoiceEngine,
         voicePipeline, setVoicePipeline,
         livekitAvailable, setLivekitAvailable,

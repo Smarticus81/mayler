@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import { useMayler } from '../context/MaylerContext';
 import { useAudio } from '../hooks/useAudio';
 import { useWakeWord } from '../hooks/useWakeWord';
@@ -10,8 +10,17 @@ import { TranscriptStream } from '../components/TranscriptStream';
 import { SettingsModal } from '../components/SettingsModal';
 import { BrandHeader } from '../components/BrandHeader';
 
+/**
+ * Main layout implementing the App State Machine per OpenAI Voice Pipeline spec:
+ *
+ *   [idle] → tap → [wake_word] → wake detected → [command] → goodbye → [wake_word]
+ *                                                           → shutdown → [shutdown] → tap → [wake_word]
+ */
 export const MainLayout: React.FC = () => {
-    const { connected, setShowSettings, error, loading, voicePipeline } = useMayler();
+    const {
+        connected, setShowSettings, error, loading, voicePipeline,
+        appMode, setAppMode, agentState, setIsWakeMode,
+    } = useMayler();
 
     // Both pipelines are initialized; only the active one is used
     const openaiPipeline = useWebRTC();
@@ -28,39 +37,102 @@ export const MainLayout: React.FC = () => {
         livekitPipeline.remoteAudioElRef.current = sharedAudioRef.current;
     });
 
-    const { initAudioContext, playWakeChime } = useAudio();
+    const { initAudioContext, soundWake, soundSleep, soundError } = useAudio();
     const { playGreeting, isReady } = useGreeting();
-    const [isActive, setIsActive] = useState(false);
 
     // Auto-connect via OpenAI when LiveKit falls back
     const prevPipelineRef = useRef(voicePipeline);
     useEffect(() => {
-        if (prevPipelineRef.current === 'livekit-cloud' && voicePipeline === 'openai-webrtc' && isActive && !connected) {
+        if (prevPipelineRef.current === 'livekit-cloud' && voicePipeline === 'openai-webrtc' && appMode === 'command' && !connected) {
             console.log('[Fallback] LiveKit → OpenAI WebRTC, auto-connecting...');
             openaiPipeline.connect(true);
         }
         prevPipelineRef.current = voicePipeline;
-    }, [voicePipeline, isActive, connected, openaiPipeline]);
+    }, [voicePipeline, appMode, connected, openaiPipeline]);
 
-    const handleStart = () => {
-        initAudioContext();
-        setIsActive(true);
-    };
-
-    useWakeWord(
-        () => {
-            if (!isActive) return;
-            console.log('Wake word detected! Connecting...');
-            if (isReady) {
-                playGreeting();
-            }
+    /**
+     * State machine tap handler per spec:
+     * idle/shutdown → wake_word (activate)
+     * wake_word → command (skip wake word, connect directly)
+     * command + speaking → interrupt
+     * command + not speaking → wake_word (disconnect)
+     */
+    const handleTap = useCallback(async () => {
+        if (appMode === 'idle' || appMode === 'shutdown') {
+            // Request mic permission + activate
+            try {
+                await navigator.mediaDevices.getUserMedia({ audio: true });
+            } catch { /* user will see permission dialog */ }
+            initAudioContext();
+            soundWake();
+            setAppMode('wake_word');
+            setIsWakeMode(true);
+        } else if (appMode === 'wake_word') {
+            // Skip wake word detection — connect directly
+            soundWake();
+            setAppMode('command');
+            setIsWakeMode(false);
             connect(true);
-        },
-        () => {
-            playWakeChime();
-        },
-        isActive && !connected
-    );
+        } else if (appMode === 'command') {
+            if (agentState === 'speaking' && 'interrupt' in activePipeline) {
+                // Tap while speaking = interrupt
+                (activePipeline as any).interrupt();
+            } else {
+                // Tap while not speaking = disconnect, return to wake_word
+                soundSleep();
+                disconnect();
+                setAppMode('wake_word');
+                setIsWakeMode(true);
+            }
+        }
+    }, [appMode, agentState, activePipeline, initAudioContext, soundWake, soundSleep, setAppMode, setIsWakeMode, connect, disconnect]);
+
+    // Wake word callbacks
+    const onWakeWordDetected = useCallback(() => {
+        if (appMode !== 'wake_word') return;
+        console.log('[MainLayout] Wake word detected! Connecting...');
+        setAppMode('command');
+        setIsWakeMode(false);
+        if (isReady) playGreeting();
+        connect(true);
+    }, [appMode, setAppMode, setIsWakeMode, connect, isReady, playGreeting]);
+
+    const onStopDetected = useCallback(() => {
+        console.log('[MainLayout] Stop phrase detected — returning to wake_word');
+        if (connected) {
+            disconnect();
+        }
+        soundSleep();
+        setAppMode('wake_word');
+        setIsWakeMode(true);
+    }, [connected, disconnect, soundSleep, setAppMode, setIsWakeMode]);
+
+    const onShutdownDetected = useCallback(() => {
+        console.log('[MainLayout] Shutdown phrase detected');
+        if (connected) {
+            disconnect();
+        }
+        soundSleep();
+        setAppMode('shutdown');
+        setIsWakeMode(false);
+    }, [connected, disconnect, soundSleep, setAppMode, setIsWakeMode]);
+
+    const onChime = useCallback(() => {
+        soundWake();
+    }, [soundWake]);
+
+    useWakeWord({
+        onWakeWordDetected,
+        onStopDetected,
+        onShutdownDetected,
+        onChime,
+        isActive: appMode === 'wake_word' && !connected,
+    });
+
+    // Play error sound when error occurs
+    useEffect(() => {
+        if (error) soundError();
+    }, [error, soundError]);
 
     return (
         <div className="mayler-container">
@@ -116,17 +188,25 @@ export const MainLayout: React.FC = () => {
 
                 <TranscriptStream />
 
-                {!isActive && (
+                {appMode === 'idle' && (
                     <div className="status-hint">
-                        <button className="primary-btn pulse" onClick={handleStart}>
+                        <button className="primary-btn pulse" onClick={handleTap}>
                             Activate Mayler
                         </button>
                     </div>
                 )}
 
-                {isActive && !connected && !loading && (
+                {appMode === 'shutdown' && (
                     <div className="status-hint">
-                        Say "Hey Mayler" to start
+                        <button className="primary-btn" onClick={handleTap}>
+                            Reactivate Mayler
+                        </button>
+                    </div>
+                )}
+
+                {appMode === 'wake_word' && !connected && !loading && (
+                    <div className="status-hint" onClick={handleTap} style={{ cursor: 'pointer' }}>
+                        Say "Hey Mayler" or tap to start
                     </div>
                 )}
 
@@ -141,8 +221,8 @@ export const MainLayout: React.FC = () => {
 
             {connected && (
                 <div className="controls">
-                    <button className="primary-btn disconnect" onClick={disconnect}>
-                        Disconnect
+                    <button className="primary-btn disconnect" onClick={handleTap}>
+                        {agentState === 'speaking' ? 'Interrupt' : 'Disconnect'}
                     </button>
                 </div>
             )}
